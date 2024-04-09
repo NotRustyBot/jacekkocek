@@ -4,7 +4,7 @@ function flatStatsToString(fs: FlatStats) {
         .join(" | ");
 }
 
-function tweaker(item: ItemType, tweak = 0): ShipItem {
+function itemizer(item: ItemType, tweak = 0): ShipItem {
     const stats = {
         agility: 0,
         armor: 0,
@@ -14,8 +14,11 @@ function tweaker(item: ItemType, tweak = 0): ShipItem {
     };
 
     const keys = Object.keys(stats) as Array<keyof typeof stats>;
-    const durability = itemDefinitions[item].durability;
-    const baseStats = itemDefinitions[item].baseStats;
+    const definition = itemDefinitions[item];
+    const durability = definition.durability;
+    const baseStats = definition.baseStats;
+
+    if (definition.slot == ItemSlot.asset) tweak = 0;
 
     stats.agility += baseStats?.agility ?? 0;
     stats.armor += baseStats?.armor ?? 0;
@@ -41,6 +44,13 @@ class Ship {
         crew: 3,
         sensors: 3,
     };
+
+    resources: Record<Resource, number> = {
+        [Resource.intel]: 0,
+        [Resource.material]: 0,
+        [Resource.research]: 0,
+    };
+
     buffs = new Array<Buff>();
     items = new Array<ShipItem>();
 
@@ -177,17 +187,19 @@ class Game {
         system: 2,
         module: 3,
         affiliate: 1,
+        asset: 0,
     };
     slotCost: Record<ItemSlot, number> = {
         system: 10,
         module: 25,
         affiliate: 10,
+        asset: 0,
     };
     context = ActionContext.event;
 }
 
 let game = new Game();
-game.currentLevel.pointsOfInterest.push({hidden: true, name: "Defense Platform", description: "A bloody gun pointin at ya"});
+game.currentLevel.pointsOfInterest.push({ hidden: true, name: "Defense Platform", description: "A bloody gun pointin at ya" });
 
 type ShipItem = {
     item: ItemType;
@@ -207,6 +219,7 @@ enum ItemSlot {
     system = "system",
     module = "module",
     affiliate = "affiliate",
+    asset = "asset",
 }
 
 type ItemDefinition = {
@@ -219,12 +232,12 @@ type ItemDefinition = {
     actions?: Array<ActionType>;
 };
 
-
 enum ActionTarget {
     none,
     otherShip,
     anyShip,
     secondary,
+    affiliate,
 }
 
 type ActionDefinition = {
@@ -279,6 +292,7 @@ enum ItemType {
     ace,
     tacticalOfficer,
     gapaChair,
+    talentInc,
 }
 
 enum ActionType {
@@ -485,6 +499,13 @@ const itemDefinitions: Record<ItemType, ItemDefinition> = {
         description: "Sometimes it's good to have someone from the HQ on board.",
         slot: ItemSlot.module,
     },
+    [ItemType.talentInc]: {
+        name: "Talent Inc.",
+        description: "Top of the line humans.",
+        slot: ItemSlot.affiliate,
+        durability: 1,
+        actions: [],
+    },
 };
 
 const actionDefinition: Record<ActionType, ActionDefinition> = {
@@ -548,7 +569,6 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
         target: ActionTarget.none,
         secret: true,
         action(ship) {
-
             ship.objectivePoints -= 3;
             ship.useDurability(ItemType.intelOfficer);
             let discovered: PointOfInterest = undefined;
@@ -558,10 +578,10 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
                 discovered = poi;
                 break;
             }
-            
+
             if (discovered) {
                 console.log(discovered);
-                
+
                 return ship.discover(discovered);
             } else {
                 return "No points of interest.";
@@ -579,7 +599,7 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
             ship.useDurability(ItemType.intelOfficer);
             return target.shipInfo([ItemSlot.system, ItemSlot.module], true, true);
         },
-    },
+    }
 };
 
 enum Resource {
@@ -625,22 +645,28 @@ const affiliateDefinition: Record<AffiliateType, AffiliateInfo> = {
             },
             {
                 item: ItemType.tacticalOfficer,
-                level: 2,
+                level: 3,
             },
             {
                 item: ItemType.gapaChair,
-                level: 3,
+                level: 5,
             },
         ],
     },
 };
 
+function makeAffiliateOffer(affiliate: AffiliateType, level: number) {
+    const info = affiliateDefinition[affiliate];
+    const possibleOffers = info.offers.filter((o) => o.level <= level);
+    return possibleOffers.at(Math.floor(Math.random() * possibleOffers.length));
+}
+
 const ship = new Ship();
-ship.items.push(tweaker(ItemType.balancedImprovements));
-ship.items.push(tweaker(ItemType.awareMod));
-ship.items.push(tweaker(ItemType.crewSpec));
-ship.items.push(tweaker(ItemType.intelOfficer));
-ship.items.push(tweaker(ItemType.infiltrator));
+ship.items.push(itemizer(ItemType.balancedImprovements));
+ship.items.push(itemizer(ItemType.awareMod));
+ship.items.push(itemizer(ItemType.crewSpec));
+ship.items.push(itemizer(ItemType.intelOfficer));
+ship.items.push(itemizer(ItemType.infiltrator));
 console.log(ship.shipInfo([ItemSlot.system, ItemSlot.module, ItemSlot.affiliate], true, true));
 console.log(ship.maintnance());
 console.log(ship.possibleActions().map((a) => actionDefinition[a].name));
