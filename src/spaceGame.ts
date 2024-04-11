@@ -4,8 +4,8 @@ function flatStatsToString(fs: FlatStats) {
         .join(" | ");
 }
 
-function pickRandom<T extends any>(arry: Array<T>): T{
-    return arry[Math.floor(Math.random()*arry.length)]
+function pickRandom<T extends any>(arry: Array<T>): T {
+    return arry[Math.floor(Math.random() * arry.length)];
 }
 
 function itemizer(item: ItemType, tweak = 0): ShipItem {
@@ -38,6 +38,7 @@ function itemizer(item: ItemType, tweak = 0): ShipItem {
 }
 
 class Ship {
+    name: string;
     objectivePoints = 0;
     shipBase: FlatStats = {
         agility: 3,
@@ -174,14 +175,14 @@ enum PoiType {
     laboratory,
     excavationSite,
     defensePlatform,
-    militaryOutpost
+    militaryOutpost,
 }
 
 type PoiInfo = {
     name: string;
     description: string;
     affiliate?: AffiliateType;
-    hidden?: true;
+    hidden?: boolean;
 };
 
 enum InterestCategory {
@@ -189,30 +190,26 @@ enum InterestCategory {
     research,
     resourceAquisition,
     wip,
-    intel
+    intel,
 }
 
 type PoiGenerator = {
     name: string;
     description: string;
-    hidden: number
-    nick: string[],
+    hidden: number;
+    nick: string[];
 };
 
-const militaryNick: Array<string> = [
-    "Raven",
-    "Overlord"
-]
+const militaryNick: Array<string> = ["Raven", "Overlord"];
 
 const PoiDefinition: Record<PoiType, PoiGenerator> = {
     [PoiType.missileSilo]: {
         name: "Missile Silo",
         description: "Military installation capable of launching missiles",
         hidden: 0.9,
-        nick: militaryNick
-    }
-}
-
+        nick: militaryNick,
+    },
+};
 
 class GameLevel {
     poiExists(poi: PoiInfo): boolean {
@@ -228,22 +225,24 @@ enum ActionContext {
 }
 
 type LevelInfo = {
-    name: string,
-    primaryStats: FlatStats,
-    stages: number,
-    difficulty: number,
-    complexity: number,
-}
+    name: string;
+    primaryStats: FlatStats;
+    stages: number;
+    difficulty: number;
+    complexity: number;
+};
 
 class Game {
-    say(arg0: string) {
-        throw new Error("Method not implemented.");
+    say(text: string) {
+        console.log(text);
     }
+
     destroyPoi(target: PoiInfo) {
         throw new Error("Method not implemented.");
     }
+    
     currentLevel = new GameLevel();
-    readyAction = new Array<ReadyAction>()
+    readyAction = new Array<ReadyAction>();
     freeSlotLimits: Record<ItemSlot, number> = {
         system: 2,
         module: 3,
@@ -268,11 +267,8 @@ class Game {
 
     initialiseLevel(info: LevelInfo) {
         const complexity = info.complexity + Math.floor(info.complexity * Math.random());
-        for (let i = 0; i < complexity; i++) {
-          
-        }
+        for (let i = 0; i < complexity; i++) {}
     }
-
 }
 
 let game = new Game();
@@ -295,8 +291,18 @@ enum ItemSlot {
     system = "system",
     module = "module",
     affiliate = "affiliate",
-    action = "action"
+    action = "action",
 }
+
+enum ItemEventType {
+    turnStart,
+    turnEnd,
+}
+
+type ItemEvent = {
+    type: ItemEventType;
+    action: (ship: Ship) => void;
+};
 
 type ItemDefinition = {
     name: string;
@@ -306,6 +312,7 @@ type ItemDefinition = {
     durability?: number;
     secret?: true;
     actions?: Array<ActionType>;
+    events?: Array<ItemEvent>;
 };
 
 enum ActionTarget {
@@ -325,21 +332,21 @@ type ActionDefinition = {
 
 type TargetedAction =
     | {
-        target: ActionTarget.none;
-        action(ship: Ship): string | void;
-    }
+          target: ActionTarget.none;
+          action(ship: Ship): string | void;
+      }
     | {
-        target: ActionTarget.otherShip;
-        action(ship: Ship, target: Ship): string | void;
-    }
+          target: ActionTarget.otherShip;
+          action(ship: Ship, target: Ship): string | void;
+      }
     | {
-        target: ActionTarget.anyShip;
-        action(ship: Ship, target: Ship): string | void;
-    }
+          target: ActionTarget.anyShip;
+          action(ship: Ship, target: Ship): string | void;
+      }
     | {
-        target: ActionTarget.secondary;
-        action(ship: Ship, target: any): string | void;
-    };
+          target: ActionTarget.secondary;
+          action(ship: Ship, target: any): string | void;
+      };
 
 enum ItemType {
     balancedImprovements,
@@ -675,7 +682,7 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
             ship.useDurability(ItemType.intelOfficer);
             return target.shipInfo([ItemSlot.system, ItemSlot.module], true, true);
         },
-    }
+    },
 };
 
 enum Resource {
@@ -686,41 +693,55 @@ enum Resource {
 
 enum ReadyActionType {
     missileSiloFireAtShip,
-    missileSiloFireAtPoi
+    missileSiloFireAtPoi,
 }
 
-type ReadyAction = {
-    action: ReadyActionType.missileSiloFireAtShip,
-    data: {
-        poi: PoiInfo,
-        target: Ship
-    }
-} | {
-    action: ReadyActionType.missileSiloFireAtPoi,
-    data: {
-        poi: PoiInfo,
-        target: PoiInfo
-    }
-}
+type ReadyAction =
+    | {
+          action: ReadyActionType.missileSiloFireAtShip;
+          data: {
+              poi: PoiInfo;
+              target: Ship;
+          };
+      }
+    | {
+          action: ReadyActionType.missileSiloFireAtPoi;
+          data: {
+              poi: PoiInfo;
+              target: PoiInfo;
+          };
+      };
 
 const readyActionDefinition: Record<ReadyActionType, (ra: ReadyAction) => void> = {
-    [ReadyActionType.missileSiloFireAtPoi]: (ra: ReadyAction)=>{
-        if(ra.action != ReadyActionType.missileSiloFireAtPoi) return;
+    [ReadyActionType.missileSiloFireAtPoi]: (ra: ReadyAction) => {
+        if (ra.action != ReadyActionType.missileSiloFireAtPoi) return;
         const data = ra.data;
-        if(game.currentLevel.poiExists(data.poi)){
-            if(game.currentLevel.poiExists(data.target)){
-                game.say(`${}`);
+        if (game.currentLevel.poiExists(data.poi)) {
+            if (game.currentLevel.poiExists(data.target)) {
+                data.poi.hidden = false;
+                game.say(`A missile was launched from **${data.poi.name}**`);
+                game.say(`The missile impacted **${data.target.name}**, destroying it instantly`);
                 game.destroyPoi(data.target);
             }
         }
-        
     },
-    [ReadyActionType.missileSiloFireAtShip]: (ra: ReadyAction)=>{
-        if(ra.action != ReadyActionType.missileSiloFireAtShip) return;
+    [ReadyActionType.missileSiloFireAtShip]: (ra: ReadyAction) => {
+        if (ra.action != ReadyActionType.missileSiloFireAtShip) return;
         const data = ra.data;
-        
+        if (game.currentLevel.poiExists(data.poi)) {
+            data.poi.hidden = false;
+            game.say(`A missile was launched from **${data.poi.name}**`);
+            const systems = data.target.items.filter((f) => itemDefinitions[f.item].slot == ItemSlot.system);
+            game.say(`The missile impacted **${data.target.name}**`);
+            if (systems.length > 0) {
+                const destroyed = pickRandom(systems);
+                const destroyedInfo = itemDefinitions[destroyed.item];
+                data.target.removeItem(destroyed);
+                game.say(`The explosion destroyed **${destroyedInfo.name}**`);
+            }
+        }
     },
-}
+};
 
 type AffiliateInfo = {
     name: string;
