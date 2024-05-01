@@ -104,8 +104,38 @@ class Ship {
         this.items.splice(this.items.indexOf(item), 1);
     }
 
+    giveItem(item: ShipItem) {
+        this.items.push(item);
+    }
+
     say(text: string) {
-        console.log(text);
+        console.log("@" + this.name + text);
+    }
+
+    processStartTurn() {
+        for (const item of this.items) {
+            const definition = itemDefinitions[item.item];
+            const actions = definition.events?.filter((f) => f.type == ItemEventType.turnStart) ?? [];
+            for (const action of actions) {
+                action.action(this);
+            }
+        }
+    }
+
+    processEndTurn() {
+        for (const item of this.items) {
+            const definition = itemDefinitions[item.item];
+
+            if (definition.decay != undefined && definition.decay == ActionDecay.turn) {
+                this.removeItem(item);
+                continue;
+            }
+
+            const actions = definition.events?.filter((f) => f.type == ItemEventType.turnEnd) ?? [];
+            for (const action of actions) {
+                action.action(this);
+            }
+        }
     }
 
     shipInfo(types: Array<ItemSlot>, showTotals = false, showBuffs = false, showSecret = false): string {
@@ -158,7 +188,8 @@ class Ship {
     doAction(action: ActionType) {
         if (this.possibleActions().includes(action)) {
             const definition = actionDefinition[action];
-            if (definition.target == ActionTarget.none) definition.action(this);
+            if (definition.target == ActionTarget.none) return definition.action(this);
+            if (definition.target == ActionTarget.poi) return definition.action(this, this.target);
         }
     }
 }
@@ -171,14 +202,16 @@ type Buff = {
 enum PoiType {
     missileSilo,
     probe,
+    /*
     broadcastTower,
     laboratory,
     excavationSite,
     defensePlatform,
-    militaryOutpost,
+    militaryOutpost,*/
 }
 
 type PoiInfo = {
+    type: PoiType;
     name: string;
     description: string;
     affiliate?: AffiliateType;
@@ -198,23 +231,60 @@ type PoiGenerator = {
     description: string;
     hidden: number;
     nick: string[];
+    onSpawn?: (poi: PoiInfo) => void;
+    onDiscovery?: (poi: PoiInfo, discoverer: Ship | false) => void;
+    onCapture?: (poi: PoiInfo, capturer: Ship) => void;
+    onHack?: (poi: PoiInfo, hacker: Ship) => void;
 };
 
-const militaryNick: Array<string> = ["Raven", "Overlord"];
+const militaryNick: Array<string> = ["Raven", "Overlord", "Citadel", "Fortress", "Bastion", "Eagle", "Vanguard", "Delta", "Phoenix", "Titan", "Shadow", "Sentinel", "Thunder"];
+const scienceNick: Array<string> = ["Echo"];
 
-const PoiDefinition: Record<PoiType, PoiGenerator> = {
+const poiDefinition: Record<PoiType, PoiGenerator> = {
     [PoiType.missileSilo]: {
         name: "Missile Silo",
         description: "Military installation capable of launching missiles",
         hidden: 0.9,
         nick: militaryNick,
+        onSpawn(poi) {
+            const ra: ReadyAction = { action: ReadyActionType.missileSiloFireAtShip, data: { poi, target: pickRandom(game.ships) } };
+            game.readyAction.push(ra);
+        },
+        onCapture(poi, capturer) {
+            game.removeReadyAction({ poi: poi });
+            const si: ShipItem = {
+                item: ItemType.missileSiloMissile,
+                poi: poi,
+                durability: 1,
+                stats: {},
+            };
+            capturer.giveItem(si);
+        },
     },
+    [PoiType.probe]: {
+        name: "Probe",
+        description: "Autonomous machine with scanning equipment",
+        hidden: 0.9,
+        nick: scienceNick,
+        onSpawn(poi) {
+            const ra: ReadyAction = { action: ReadyActionType.missileSiloFireAtShip, data: { poi, target: pickRandom(game.ships) } };
+            game.readyAction.push(ra);
+        },
+
+        onHack(poi, hacker) {
+            if(game.currentLevel.stats.sensors){
+                hacker.sca
+            }
+        },
+    }
 };
 
 class GameLevel {
+    stats: FlatStats;
     poiExists(poi: PoiInfo): boolean {
-        throw new Error("Method not implemented.");
+        return this.pointsOfInterest.includes(poi);
     }
+
     pointsOfInterest = new Array<PoiInfo>();
 }
 
@@ -224,6 +294,12 @@ enum ActionContext {
     any,
 }
 
+type LevelTypeInfo = {
+    name: string;
+    description: string;
+    primaryStats: FlatStats;
+};
+
 type LevelInfo = {
     name: string;
     primaryStats: FlatStats;
@@ -232,15 +308,70 @@ type LevelInfo = {
     complexity: number;
 };
 
+const levelType: Array<LevelTypeInfo> = [
+    {
+        name: "Evacuation",
+        description: "$name declared emergency. You are tasked with evacuating civilians from the area. Be quick, and prepare for a bumpy landing.",
+        primaryStats: { agility: 1, armor: 1 },
+    },
+    {
+        name: "Cargo Hop",
+        description: "$name needs some supplies. Let's not keep them waiting.",
+        primaryStats: { agility: 1, cargo: 1 },
+    },
+    {
+        name: "Hit and Run",
+        description: "Rebel forces have captred highly defendable positions on $name. We need you to carry out a series of suprise attacks to assist our forces.",
+        primaryStats: { agility: 1, crew: 1 },
+    },
+    {
+        name: "Exploration",
+        description: "Some parts of $name are not fully explored. Why not take a look?",
+        primaryStats: { agility: 1, sensors: 1 },
+    },
+    {
+        name: "Combat Resupply",
+        description: "Our forces on $name are running low on supplies. Get ready to catch some strays.",
+        primaryStats: { armor: 1, cargo: 1 },
+    },
+    {
+        name: "Point Capture",
+        description: "A group of rebels is currently attempting to overthrow the goverment on $name, by force. Stop them.",
+        primaryStats: { armor: 1, crew: 1 },
+    },
+    {
+        name: "Anomaly Scan",
+        description: "Something is going on on $name. It doesn't look safe. Investigate the situation.",
+        primaryStats: { armor: 1, sensors: 1 },
+    },
+    {
+        name: "Battlefield Salvage",
+        description: "After the incident on $name, there is a lot of scrap. We don't really need it, but we don't want the rebels to have it.",
+        primaryStats: { cargo: 1, crew: 1 },
+    },
+    {
+        name: "Prospects",
+        description: "It appears $name has a few deposits of the good stuff. Find them, and bring us some samples.",
+        primaryStats: { cargo: 1, sensors: 1 },
+    },
+    {
+        name: "Search and Rescue",
+        description: "This time you need to find and rescue survivors of a recent disaster on $name.",
+        primaryStats: { crew: 1, sensors: 1 },
+    },
+];
+
 class Game {
+    ships = new Array<Ship>();
     say(text: string) {
         console.log(text);
     }
 
     destroyPoi(target: PoiInfo) {
-        throw new Error("Method not implemented.");
+        const index = this.currentLevel.pointsOfInterest.indexOf(target);
+        this.currentLevel.pointsOfInterest.splice(index, 1);
     }
-    
+
     currentLevel = new GameLevel();
     readyAction = new Array<ReadyAction>();
     freeSlotLimits: Record<ItemSlot, number> = {
@@ -257,27 +388,150 @@ class Game {
     };
 
     context = ActionContext.event;
-
+    removeReadyAction(filter: any) {
+        const removeAt = this.readyAction.findIndex((ra) => Object.entries(filter).every(([k, v]) => v == ra.data[k]));
+        this.readyAction.splice(removeAt, 1);
+    }
     processTurn() {
         for (const ready of this.readyAction) {
             const action = ready.action;
             readyActionDefinition[action](ready);
         }
+
+        for (const ship of this.ships) {
+            ship.processEndTurn();
+        }
+
+        this.awardOP();
+    }
+
+    awardOP() {
+        let teamTotal = 0;
+        let teamTotalGain = 0;
+        for (const ship of this.ships) {
+            let total = 1;
+            for (const [key, value] of Object.entries(this.currentLevel.stats)) {
+                if (value) {
+                    total *= value * ship.totalStats()[key];
+                }
+            }
+
+            teamTotalGain += total;
+            ship.objectivePoints += total;
+            teamTotal += ship.objectivePoints;
+            this.say(`**${ship.name}** earned ${total} Objective Points this round. Total: ${ship.objectivePoints}`);
+        }
+
+        this.say(`Team gained ${teamTotalGain} OP this round. Total ${teamTotal}`);
+    }
+
+    chooseLevel(): LevelInfo {
+        const pickedType = pickRandom(levelType);
+        const place = [
+            "Solstice",
+            "Hypernova",
+            "Orion",
+            "Centauri",
+            "Nova",
+            "Draco",
+            "Andromeda",
+            "Phoenix",
+            "Polaris",
+            "Colangula",
+            "Araket",
+            "Pulsar",
+            "Vega",
+            "Sirius",
+            "Vista",
+            "Alico",
+            "Zebra",
+            "Trident",
+            "Dark",
+            "Far",
+            "Inner",
+            "Central",
+        ];
+
+        const systems = [
+            "Belt",
+            "System",
+            "Cluster",
+            "Mainstar",
+            "Dwarf",
+            "Orbital",
+            "Nebula",
+            "Arrangement",
+        ]
+
+        const latinNumbers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
+        const moon = ["", "", "", "a", "a", "a", "b", "b", "c"];
+        const system = `${pickRandom(place)} ${pickRandom(systems)} ${pickRandom(latinNumbers)}${pickRandom(moon)}`;
+        const info: LevelInfo = {
+            name: `${system} - ${pickedType.name}`,
+            complexity: 2,
+            difficulty: 1,
+            primaryStats: pickedType.primaryStats,
+            stages: 1,
+        };
+        this.say(info.name);
+        let desc = pickedType.description;
+        this.say(desc.replaceAll("$name", system));
+
+        return info;
     }
 
     initialiseLevel(info: LevelInfo) {
         const complexity = info.complexity + Math.floor(info.complexity * Math.random());
-        for (let i = 0; i < complexity; i++) {}
+        this.currentLevel = new GameLevel();
+
+        for (let i = 0; i < complexity; i++) {
+            const poiType = Math.floor(Math.random() * Object.entries(poiDefinition).length) as PoiType;
+            console.log(poiType);
+
+            const poiGen: PoiGenerator = poiDefinition[poiType];
+
+            const newPoi: PoiInfo = {
+                type: poiType,
+                name: pickRandom(poiGen.nick) + ` ${Math.floor(Math.random() * 9 + 1)} ` + poiGen.name,
+                description: poiGen.description,
+                hidden: Math.random() < poiGen.hidden,
+            };
+
+            poiGen.onSpawn(newPoi);
+            this.currentLevel.pointsOfInterest.push(newPoi);
+            this.currentLevel.stats = info.primaryStats;
+        }
+
+        this.stageStart();
+    }
+
+    stageStart() {
+        for (const ship of this.ships) {
+            ship.processStartTurn();
+        }
+    }
+
+    attackPoi(target: PoiInfo) {
+        let isProtected = false;
+        this.destroyPoi(target);
+        return isProtected;
     }
 }
 
 let game = new Game();
 
-type ShipItem = {
-    item: ItemType;
-    stats: FlatStats;
-    durability: number;
-};
+type ShipItem =
+    | {
+          item: ItemType;
+          stats: FlatStats;
+          durability: number;
+      }
+    | {
+          item: ItemType.missileSiloMissile;
+          stats: FlatStats;
+          durability: number;
+          poi: PoiInfo;
+      };
 
 type FlatStats = {
     agility?: number;
@@ -304,6 +558,11 @@ type ItemEvent = {
     action: (ship: Ship) => void;
 };
 
+enum ActionDecay {
+    turn,
+    level,
+}
+
 type ItemDefinition = {
     name: string;
     description: string;
@@ -313,13 +572,14 @@ type ItemDefinition = {
     secret?: true;
     actions?: Array<ActionType>;
     events?: Array<ItemEvent>;
+    decay?: ActionDecay;
 };
 
 enum ActionTarget {
     none,
     otherShip,
     anyShip,
-    secondary,
+    poi,
     affiliate,
 }
 
@@ -344,8 +604,8 @@ type TargetedAction =
           action(ship: Ship, target: Ship): string | void;
       }
     | {
-          target: ActionTarget.secondary;
-          action(ship: Ship, target: any): string | void;
+          target: ActionTarget.poi;
+          action(ship: Ship, target: PoiInfo): string | void;
       };
 
 enum ItemType {
@@ -376,6 +636,9 @@ enum ItemType {
     tacticalOfficer,
     gapaChair,
     talentInc,
+    intelOfficerBasicScan,
+    missileSiloMissile,
+    infiltratorPoiCapture,
 }
 
 enum ActionType {
@@ -386,6 +649,9 @@ enum ActionType {
     expeditionGear,
     intelOfficerBroadScan,
     intelOfficerShipScan,
+    missileSiloAntiPoI,
+    missileSiloAntiShip,
+    infiltratorOperation,
 }
 
 const itemDefinitions: Record<ItemType, ItemDefinition> = {
@@ -558,14 +824,51 @@ const itemDefinitions: Record<ItemType, ItemDefinition> = {
     },
     [ItemType.intelOfficer]: {
         name: "Intel Officer",
-        description: "Reveals hidden information using sensors",
+        description: "Enables basic scanning using sensors",
         slot: ItemSlot.module,
+        events: [
+            {
+                type: ItemEventType.turnStart,
+                action(ship) {
+                    ship.giveItem({
+                        item: ItemType.intelOfficerBasicScan,
+                        durability: 0,
+                        stats: {},
+                    });
+                },
+            },
+        ],
+    },
+    [ItemType.intelOfficerBasicScan]: {
+        name: "Basic Scan",
+        description: "(Intel Officer) Reveals hidden information using sensors",
+        slot: ItemSlot.action,
         actions: [ActionType.intelOfficerBroadScan, ActionType.intelOfficerShipScan],
+        decay: ActionDecay.turn,
     },
     [ItemType.infiltrator]: {
         name: "Specops Leader",
         description: "Leads your crew to complete various objectives.",
         slot: ItemSlot.module,
+        events: [
+            {
+                type: ItemEventType.turnStart,
+                action(ship) {
+                    ship.giveItem({
+                        item: ItemType.infiltratorPoiCapture,
+                        durability: 0,
+                        stats: {},
+                    });
+                },
+            },
+        ],
+    },
+    [ItemType.infiltratorPoiCapture]: {
+        name: "Infiltration Operation",
+        description: "(Specops Leader) Captures a point of interest",
+        slot: ItemSlot.action,
+        actions: [ActionType.infiltratorOperation],
+        decay: ActionDecay.turn,
     },
     [ItemType.ace]: {
         name: "Ace Pilot",
@@ -588,6 +891,13 @@ const itemDefinitions: Record<ItemType, ItemDefinition> = {
         slot: ItemSlot.affiliate,
         durability: 1,
         actions: [],
+    },
+    [ItemType.missileSiloMissile]: {
+        name: "Siloed Missile",
+        description: "A missile. Works in anti-ground, but also in anti-orbital capacity.",
+        slot: ItemSlot.action,
+        durability: 1,
+        actions: [ActionType.missileSiloAntiPoI, ActionType.missileSiloAntiShip],
     },
 };
 
@@ -653,6 +963,7 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
         secret: true,
         action(ship) {
             ship.objectivePoints -= 3;
+            ship.useDurability(ItemType.intelOfficerBasicScan);
             ship.useDurability(ItemType.intelOfficer);
             let discovered: PoiInfo = undefined;
             for (const poi of game.currentLevel.pointsOfInterest) {
@@ -663,8 +974,6 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
             }
 
             if (discovered) {
-                console.log(discovered);
-
                 return ship.discover(discovered);
             } else {
                 return "No points of interest.";
@@ -680,7 +989,76 @@ const actionDefinition: Record<ActionType, ActionDefinition> = {
         action(ship, target) {
             ship.objectivePoints -= 3;
             ship.useDurability(ItemType.intelOfficer);
+            ship.useDurability(ItemType.intelOfficerBasicScan);
             return target.shipInfo([ItemSlot.system, ItemSlot.module], true, true);
+        },
+    },
+    [ActionType.missileSiloAntiPoI]: {
+        name: "Siloed Missile - Static Target",
+        description: "Launch a missile from the silo. Destroys a point of interest.",
+        context: ActionContext.event,
+        target: ActionTarget.poi,
+        secret: true,
+        action(ship, target) {
+            const msl = ship.items.find((f) => f.item == ItemType.missileSiloMissile);
+            if ("poi" in msl && game.currentLevel.poiExists(msl.poi)) {
+                game.readyAction.push({
+                    action: ReadyActionType.missileSiloFireAtPoi,
+                    data: {
+                        poi: msl.poi,
+                        target: target,
+                    },
+                });
+                ship.useDurability(ItemType.missileSiloMissile);
+                return "Missile is locked in. ETA end of turn.";
+            } else {
+                ship.useDurability(ItemType.missileSiloMissile);
+                return "Missile cannot be fired";
+            }
+        },
+    },
+    [ActionType.missileSiloAntiShip]: {
+        name: "Siloed Missile - Ship Target",
+        description: "Launch a missile from the silo. Damages a ship.",
+        context: ActionContext.event,
+        target: ActionTarget.anyShip,
+        secret: true,
+        action(ship, target) {
+            const msl = ship.items.find((f) => f.item == ItemType.missileSiloMissile);
+            if ("poi" in msl && game.currentLevel.poiExists(msl.poi)) {
+                game.readyAction.push({
+                    action: ReadyActionType.missileSiloFireAtShip,
+                    data: {
+                        poi: msl.poi,
+                        target: target,
+                    },
+                });
+                ship.useDurability(ItemType.missileSiloMissile);
+                return "Missile is locked in. ETA end of turn.";
+            } else {
+                ship.useDurability(ItemType.missileSiloMissile);
+                return "Missile cannot be fired";
+            }
+        },
+    },
+
+    [ActionType.infiltratorOperation]: {
+        name: "Infiltration Operation",
+        description: "Captures a point of interest. -3 OP",
+        context: ActionContext.event,
+        target: ActionTarget.poi,
+        secret: true,
+        action(ship, target) {
+            const definition = poiDefinition[target.type];
+            if (definition.onCapture) {
+                definition.onCapture(target, ship);
+                return `**${target.name}** is now under our control.`;
+            } else {
+                ship.objectivePoints -= 3;
+                ship.useDurability(ItemType.infiltrator);
+                ship.useDurability(ItemType.infiltratorPoiCapture);
+                return "We cannot capture this target.";
+            }
         },
     },
 };
@@ -797,12 +1175,23 @@ function makeAffiliateOffer(affiliate: AffiliateType, level: number) {
 }
 
 const ship = new Ship();
+ship.name = "Celestia One";
+game.ships.push(ship);
 ship.items.push(itemizer(ItemType.balancedImprovements));
 ship.items.push(itemizer(ItemType.awareMod));
 ship.items.push(itemizer(ItemType.crewSpec));
 ship.items.push(itemizer(ItemType.intelOfficer));
 ship.items.push(itemizer(ItemType.infiltrator));
-console.log(ship.shipInfo([ItemSlot.system, ItemSlot.module, ItemSlot.affiliate], true, true));
-console.log(ship.maintnance());
+
+game.initialiseLevel(game.chooseLevel());
 console.log(ship.possibleActions().map((a) => actionDefinition[a].name));
-ship.doAction(ActionType.intelOfficerBroadScan);
+console.log(ship.doAction(ActionType.intelOfficerBroadScan));
+console.log(ship.doAction(ActionType.intelOfficerBroadScan));
+ship.target = ship.discoveredPointsOfInterest[0];
+ship.targetKind = ActionTarget.poi;
+console.log(ship.possibleActions().map((a) => actionDefinition[a].name));
+console.log(ship.doAction(ActionType.infiltratorOperation));
+ship.target = ship.discoveredPointsOfInterest[1];
+console.log(ship.doAction(ActionType.missileSiloAntiPoI));
+
+game.processTurn();
