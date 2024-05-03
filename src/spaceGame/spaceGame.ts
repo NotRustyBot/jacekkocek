@@ -1,12 +1,4 @@
-function flatStatsToString(fs: FlatStats) {
-    return Object.entries(fs)
-        .map(([k, v]) => `${k}:${v}`)
-        .join(" | ");
-}
-
-function pickRandom<T extends any>(arry: Array<T>): T {
-    return arry[Math.floor(Math.random() * arry.length)];
-}
+import { Ship } from "./ship";
 
 function itemizer(item: ItemType, tweak = 0): ShipItem {
     const stats = {
@@ -37,329 +29,11 @@ function itemizer(item: ItemType, tweak = 0): ShipItem {
     return { item, stats, durability };
 }
 
-class Ship {
-    name: string;
-    objectivePoints = 0;
-    shipBase: FlatStats = {
-        agility: 3,
-        armor: 3,
-        cargo: 3,
-        crew: 3,
-        sensors: 3,
-    };
-
-    resources: Record<Resource, number> = {
-        [Resource.intel]: 0,
-        [Resource.material]: 0,
-        [Resource.research]: 0,
-    };
-
-    buffs = new Array<Buff>();
-    items = new Array<ShipItem>();
-
-    discoveredPointsOfInterest = new Array<PoiInfo>();
-
-    totalStats(): FlatStats {
-        const total = { ...this.shipBase };
-
-        for (const item of this.items) {
-            total.agility += item.stats?.agility ?? 0;
-            total.armor += item.stats?.armor ?? 0;
-            total.cargo += item.stats?.cargo ?? 0;
-            total.crew += item.stats?.crew ?? 0;
-            total.sensors += item.stats?.sensors ?? 0;
-        }
-
-        for (const buff of this.buffs) {
-            total.agility += buff.stats?.agility ?? 0;
-            total.armor += buff.stats?.armor ?? 0;
-            total.cargo += buff.stats?.cargo ?? 0;
-            total.crew += buff.stats?.crew ?? 0;
-            total.sensors += buff.stats?.sensors ?? 0;
-        }
-
-        return total;
-    }
-
-    useDurability(item: ItemType) {
-        const candidates = this.items.filter((c) => c.item == item);
-        candidates.sort((a, b) => a.durability - b.durability);
-        if (candidates.length > 0) {
-            const item = candidates[0];
-            item.durability--;
-            if (item.durability <= 0) {
-                this.removeItem(item);
-            }
-        } else {
-            console.error(`Using durability of non-existent item ${item} (that's bad)`);
-        }
-    }
-
-    discover(poi: PoiInfo) {
-        this.discoveredPointsOfInterest.push(poi);
-        return `You discovered ${poi.name}\n${poi.description}`;
-    }
-
-    removeItem(item: ShipItem) {
-        this.items.splice(this.items.indexOf(item), 1);
-    }
-
-    giveItem(item: ShipItem) {
-        this.items.push(item);
-    }
-
-    say(text: string) {
-        console.log("@" + this.name + text);
-    }
-
-    processStartTurn() {
-        for (const item of this.items) {
-            const definition = itemDefinitions[item.item];
-            const actions = definition.events?.filter((f) => f.type == ItemEventType.turnStart) ?? [];
-            for (const action of actions) {
-                action.action(this);
-            }
-        }
-    }
-
-    processEndTurn() {
-        for (const item of this.items) {
-            const definition = itemDefinitions[item.item];
-
-            if (definition.decay != undefined && definition.decay == ActionDecay.turn) {
-                this.removeItem(item);
-                continue;
-            }
-
-            const actions = definition.events?.filter((f) => f.type == ItemEventType.turnEnd) ?? [];
-            for (const action of actions) {
-                action.action(this);
-            }
-        }
-    }
-
-    shipInfo(types: Array<ItemSlot>, showTotals = false, showBuffs = false, showSecret = false): string {
-        let result = "";
-        for (const type of types) {
-            result += "\n\n" + type + ":";
-            for (const item of this.items) {
-                const info = itemDefinitions[item.item];
-                if (info.slot == type && (showSecret || !info.secret)) {
-                    result += `\n${info.secret ? "*" : ""} **${info.name + (info.durability ? " (" + item.durability + ")" : "")}** ${info.description} ${info.secret ? "*" : ""}`;
-                }
-            }
-        }
-
-        if (showBuffs) {
-            result += "\n\nBuffs:";
-            for (const buff of this.buffs) {
-                result += "\n" + buff.name + flatStatsToString(buff.stats);
-            }
-        }
-
-        if (showTotals) {
-            result += "\n\nTotal:\n";
-            result += flatStatsToString(this.totalStats());
-        }
-
-        return result;
-    }
-
-    maintnance() {
-        let toPay = 0;
-        for (const key of Object.keys(ItemSlot)) {
-            const count = this.items.filter((f) => itemDefinitions[f.item].slot == key).length;
-            const overLimit = count - game.freeSlotLimits[key];
-            if (overLimit > 0) {
-                const pay = game.slotCost[key] * Math.pow(2, overLimit);
-                toPay += pay;
-            }
-        }
-        return toPay;
-    }
-
-    target = undefined;
-    targetKind = ActionTarget.none;
-    possibleActions(): Array<ActionType> {
-        const allActions = this.items.flatMap((i) => itemDefinitions[i.item].actions).filter((f) => f != undefined);
-        return allActions.filter((a) => actionDefinition[a].context == game.context && actionDefinition[a].target == this.targetKind);
-    }
-
-    doAction(action: ActionType) {
-        if (this.possibleActions().includes(action)) {
-            const definition = actionDefinition[action];
-            if (definition.target == ActionTarget.none) return definition.action(this);
-            if (definition.target == ActionTarget.poi) return definition.action(this, this.target);
-        }
-    }
-}
-
 type Buff = {
     name: string;
     stats: FlatStats;
 };
 
-enum PoiType {
-    missileSilo,
-    probe,
-    /*
-    broadcastTower,
-    laboratory,
-    excavationSite,
-    defensePlatform,
-    militaryOutpost,*/
-}
-
-type PoiInfo = {
-    type: PoiType;
-    name: string;
-    description: string;
-    affiliate?: AffiliateType;
-    hidden?: boolean;
-};
-
-enum InterestCategory {
-    military,
-    research,
-    resourceAquisition,
-    wip,
-    intel,
-}
-
-type PoiGenerator = {
-    name: string;
-    description: string;
-    hidden: number;
-    nick: string[];
-    onSpawn?: (poi: PoiInfo) => void;
-    onDiscovery?: (poi: PoiInfo, discoverer: Ship | false) => void;
-    onCapture?: (poi: PoiInfo, capturer: Ship) => void;
-    onHack?: (poi: PoiInfo, hacker: Ship) => void;
-};
-
-const militaryNick: Array<string> = ["Raven", "Overlord", "Citadel", "Fortress", "Bastion", "Eagle", "Vanguard", "Delta", "Phoenix", "Titan", "Shadow", "Sentinel", "Thunder"];
-const scienceNick: Array<string> = ["Echo"];
-
-const poiDefinition: Record<PoiType, PoiGenerator> = {
-    [PoiType.missileSilo]: {
-        name: "Missile Silo",
-        description: "Military installation capable of launching missiles",
-        hidden: 0.9,
-        nick: militaryNick,
-        onSpawn(poi) {
-            const ra: ReadyAction = { action: ReadyActionType.missileSiloFireAtShip, data: { poi, target: pickRandom(game.ships) } };
-            game.readyAction.push(ra);
-        },
-        onCapture(poi, capturer) {
-            game.removeReadyAction({ poi: poi });
-            const si: ShipItem = {
-                item: ItemType.missileSiloMissile,
-                poi: poi,
-                durability: 1,
-                stats: {},
-            };
-            capturer.giveItem(si);
-        },
-    },
-    [PoiType.probe]: {
-        name: "Probe",
-        description: "Autonomous machine with scanning equipment",
-        hidden: 0.9,
-        nick: scienceNick,
-        onSpawn(poi) {
-            const ra: ReadyAction = { action: ReadyActionType.missileSiloFireAtShip, data: { poi, target: pickRandom(game.ships) } };
-            game.readyAction.push(ra);
-        },
-
-        onHack(poi, hacker) {
-            if(game.currentLevel.stats.sensors){
-                hacker.sca
-            }
-        },
-    }
-};
-
-class GameLevel {
-    stats: FlatStats;
-    poiExists(poi: PoiInfo): boolean {
-        return this.pointsOfInterest.includes(poi);
-    }
-
-    pointsOfInterest = new Array<PoiInfo>();
-}
-
-enum ActionContext {
-    base,
-    event,
-    any,
-}
-
-type LevelTypeInfo = {
-    name: string;
-    description: string;
-    primaryStats: FlatStats;
-};
-
-type LevelInfo = {
-    name: string;
-    primaryStats: FlatStats;
-    stages: number;
-    difficulty: number;
-    complexity: number;
-};
-
-const levelType: Array<LevelTypeInfo> = [
-    {
-        name: "Evacuation",
-        description: "$name declared emergency. You are tasked with evacuating civilians from the area. Be quick, and prepare for a bumpy landing.",
-        primaryStats: { agility: 1, armor: 1 },
-    },
-    {
-        name: "Cargo Hop",
-        description: "$name needs some supplies. Let's not keep them waiting.",
-        primaryStats: { agility: 1, cargo: 1 },
-    },
-    {
-        name: "Hit and Run",
-        description: "Rebel forces have captred highly defendable positions on $name. We need you to carry out a series of suprise attacks to assist our forces.",
-        primaryStats: { agility: 1, crew: 1 },
-    },
-    {
-        name: "Exploration",
-        description: "Some parts of $name are not fully explored. Why not take a look?",
-        primaryStats: { agility: 1, sensors: 1 },
-    },
-    {
-        name: "Combat Resupply",
-        description: "Our forces on $name are running low on supplies. Get ready to catch some strays.",
-        primaryStats: { armor: 1, cargo: 1 },
-    },
-    {
-        name: "Point Capture",
-        description: "A group of rebels is currently attempting to overthrow the goverment on $name, by force. Stop them.",
-        primaryStats: { armor: 1, crew: 1 },
-    },
-    {
-        name: "Anomaly Scan",
-        description: "Something is going on on $name. It doesn't look safe. Investigate the situation.",
-        primaryStats: { armor: 1, sensors: 1 },
-    },
-    {
-        name: "Battlefield Salvage",
-        description: "After the incident on $name, there is a lot of scrap. We don't really need it, but we don't want the rebels to have it.",
-        primaryStats: { cargo: 1, crew: 1 },
-    },
-    {
-        name: "Prospects",
-        description: "It appears $name has a few deposits of the good stuff. Find them, and bring us some samples.",
-        primaryStats: { cargo: 1, sensors: 1 },
-    },
-    {
-        name: "Search and Rescue",
-        description: "This time you need to find and rescue survivors of a recent disaster on $name.",
-        primaryStats: { crew: 1, sensors: 1 },
-    },
-];
 
 class Game {
     ships = new Array<Ship>();
@@ -521,17 +195,11 @@ class Game {
 let game = new Game();
 
 type ShipItem =
-    | {
-          item: ItemType;
-          stats: FlatStats;
-          durability: number;
-      }
-    | {
-          item: ItemType.missileSiloMissile;
-          stats: FlatStats;
-          durability: number;
-          poi: PoiInfo;
-      };
+    {
+        item: ItemType;
+        stats: FlatStats;
+        durability: number;
+    }
 
 type FlatStats = {
     agility?: number;
@@ -592,21 +260,21 @@ type ActionDefinition = {
 
 type TargetedAction =
     | {
-          target: ActionTarget.none;
-          action(ship: Ship): string | void;
-      }
+        target: ActionTarget.none;
+        action(ship: Ship): string | void;
+    }
     | {
-          target: ActionTarget.otherShip;
-          action(ship: Ship, target: Ship): string | void;
-      }
+        target: ActionTarget.otherShip;
+        action(ship: Ship, target: Ship): string | void;
+    }
     | {
-          target: ActionTarget.anyShip;
-          action(ship: Ship, target: Ship): string | void;
-      }
+        target: ActionTarget.anyShip;
+        action(ship: Ship, target: Ship): string | void;
+    }
     | {
-          target: ActionTarget.poi;
-          action(ship: Ship, target: PoiInfo): string | void;
-      };
+        target: ActionTarget.poi;
+        action(ship: Ship, target: PoiInfo): string | void;
+    };
 
 enum ItemType {
     balancedImprovements,
@@ -1076,19 +744,19 @@ enum ReadyActionType {
 
 type ReadyAction =
     | {
-          action: ReadyActionType.missileSiloFireAtShip;
-          data: {
-              poi: PoiInfo;
-              target: Ship;
-          };
-      }
+        action: ReadyActionType.missileSiloFireAtShip;
+        data: {
+            poi: PoiInfo;
+            target: Ship;
+        };
+    }
     | {
-          action: ReadyActionType.missileSiloFireAtPoi;
-          data: {
-              poi: PoiInfo;
-              target: PoiInfo;
-          };
-      };
+        action: ReadyActionType.missileSiloFireAtPoi;
+        data: {
+            poi: PoiInfo;
+            target: PoiInfo;
+        };
+    };
 
 const readyActionDefinition: Record<ReadyActionType, (ra: ReadyAction) => void> = {
     [ReadyActionType.missileSiloFireAtPoi]: (ra: ReadyAction) => {
@@ -1185,13 +853,13 @@ ship.items.push(itemizer(ItemType.infiltrator));
 
 game.initialiseLevel(game.chooseLevel());
 console.log(ship.possibleActions().map((a) => actionDefinition[a].name));
-console.log(ship.doAction(ActionType.intelOfficerBroadScan));
-console.log(ship.doAction(ActionType.intelOfficerBroadScan));
+console.log(ship.playCard(ActionType.intelOfficerBroadScan));
+console.log(ship.playCard(ActionType.intelOfficerBroadScan));
 ship.target = ship.discoveredPointsOfInterest[0];
 ship.targetKind = ActionTarget.poi;
 console.log(ship.possibleActions().map((a) => actionDefinition[a].name));
-console.log(ship.doAction(ActionType.infiltratorOperation));
+console.log(ship.playCard(ActionType.infiltratorOperation));
 ship.target = ship.discoveredPointsOfInterest[1];
-console.log(ship.doAction(ActionType.missileSiloAntiPoI));
+console.log(ship.playCard(ActionType.missileSiloAntiPoI));
 
 game.processTurn();
