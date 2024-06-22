@@ -1,12 +1,17 @@
-import { Game } from "./game";
-import { StructuralItem } from "./item";
-import { Ship } from "./ship";
+import { DiscordGameInterface } from "./discordInterface";
 
-const game = new Game();
+export function scenario(dif: DiscordGameInterface) {
+    //dif.createShip("500632024831492100", "name-ship");
+    //dif.joinMission("500632024831492100");
+    
+    dif.createShip("645206726097764364", "Norubo");
+    dif.joinMission("645206726097764364");
+    dif.getItem("645206726097764364", "SPAM Launcher");
+    dif.getItem("645206726097764364", "Antikythera Computing System");
 
-const ship = new Ship(game, "Jacek");
-game.addShip(ship);
-const item = new StructuralItem("Radar", "Radar");
-item.statsToAdd.sensors = 8;
-ship.addItem(item);
-console.log(ship.itemStats.toString());
+    //dif.createShip("532918953014722560", "kwoerk");
+    //dif.joinMission("532918953014722560");
+    //dif.getItem("532918953014722560", "Silkers Tactical Team");
+    //dif.getItem("532918953014722560", "Echo Propulsion");
+
+}

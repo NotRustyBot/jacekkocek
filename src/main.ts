@@ -24,6 +24,7 @@ import { Mongo } from "./mongo";
 import { Policy } from "./policy";
 import { Assignment } from "./assignments";
 import { User } from "./user";
+import { DiscordGameInterface } from "./game/discordInterface";
 require("console-stamp")(console, {
     format: ":date(dd/mm/yyyy HH:MM:ss.l)",
 });
@@ -295,6 +296,8 @@ loadReminders();
 
 let baseUrl = "https://jacekkocek.coal.games";
 
+let discordInterface: DiscordGameInterface;
+
 // Log our bot in using the token from https://discordapp.com/developers/applications/me
 
 client.login(process.env.DISCORD_API_KEY);
@@ -323,6 +326,8 @@ client.on("ready", async () => {
     mainVoiceChannel = (await mainGuild.channels.fetch(mainVoiceChannelId)) as Discord.VoiceChannel;
     managerRole = await mainGuild.roles.fetch(managerRoleId);
     adminId = process.env.ADMIN_ID?.split(",") ?? defaultAdminId;
+
+    discordInterface = new DiscordGameInterface((await mainGuild.channels.fetch("1242744449562447872")) as Discord.TextChannel);
 
     if (production)
         client.guilds.fetch("728312628413333584").then((guild) => {
@@ -709,6 +714,76 @@ client.on("interactionCreate", async (interaction) => {
                             interaction.reply(reply);
                             setCalcContext(total, interaction.channelId);
                         });
+                        break;
+                    }
+                }
+                break;
+            }
+            case "game": {
+                switch (interaction.options.getSubcommand()) {
+                    case "create-ship": {
+                        const name = interaction.options.getString("ship-name");
+                        const result = discordInterface.createShip(interaction.user.id, name);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "get-item": {
+                        const id = interaction.options.getString("item-id");
+                        const result = discordInterface.getItem(interaction.user.id, id);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "play-card": {
+                        const id = interaction.options.getInteger("card-id");
+                        const result = discordInterface.playCard(interaction.user.id, id);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "buy-item": {
+                        const id = interaction.options.getInteger("trade-id");
+                        const result = discordInterface.buyItem(interaction.user.id, id);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "cards": {
+                        const result = discordInterface.showCards(interaction.user.id);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "tick": {
+                        discordInterface.tick();
+                        interaction.reply({ content: "ticking" });
+                        break;
+                    }
+
+
+                    case "join-mission": {
+                        const result = discordInterface.joinMission(interaction.user.id);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "leave-mission": {
+                        const result = discordInterface.leaveMission(interaction.user.id);
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "show-landmarks": {
+                        const result = discordInterface.showLandmarks();
+                        interaction.reply({ content: result });
+                        break;
+                    }
+
+                    case "target-landmark": {
+                        const id = interaction.options.getInteger("landmark-id");
+                        const result = discordInterface.targetLandmark(interaction.user.id, id);
+                        interaction.reply({ content: result });
                         break;
                     }
                 }

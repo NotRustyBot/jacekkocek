@@ -1,31 +1,34 @@
 import { Card, CardTemplate } from "./card";
+import { Game } from "./game";
 import { FlatStatsData, FlatStats, Ship } from "./ship";
 
-
-enum ItemBehaviourKind {
+export enum ItemBehaviourKind {
     structuralItem,
-    cardProvier
+    consumableProvider,
 }
 type ItemBehaviourDefinition = {
     kind: ItemBehaviourKind;
     followUp?: ItemBehaviourDefinition;
     data: any;
-}
+};
 
 export type ItemTemplate = {
     behaviour: ItemBehaviourDefinition;
     name: string;
-    description: string;
-}
+    description?: string;
+};
 
 export class Item {
     id: number;
     template: ItemTemplate;
     behaviours = new Array<ItemBehaviour>();
-    create() {
+    constructor(game: Game, template: ItemTemplate) {
+        this.id = game.itemIdProvider();
+        this.template = template;
         let behave = this.template.behaviour;
         while (behave) {
-            this.behaviours.push(new ItemBehaviourLookup[behave.kind](behave.data));
+            const behaviourConstructor = ItemBehaviourLookup[behave.kind];
+            this.behaviours.push(new behaviourConstructor(game, this, behave.data));
             behave = behave.followUp;
         }
     }
@@ -35,66 +38,87 @@ export class Item {
     }
 
     public get description(): string {
-        return this.template.description;
+        return this.description;
     }
 
-    onEquip(ship: Ship) {
-        console.log(ship.name + " equipped " + this.name);
-    }
-
-    onUnequip(ship: Ship) {
-        console.log(ship.name + " unequipped " + this.name);
+    onMissionStart(ship: Ship) {
+        for (const behaviour of this.behaviours) {
+            behaviour.onMissionStart(ship);
+        }
     }
 
     onTurnStart(ship: Ship) {
+        for (const behaviour of this.behaviours) {
+            behaviour.onTurnStart(ship);
+        }
     }
 
     onTurnEnd(ship: Ship) {
-    }
-
-}
-
-abstract class ItemBehaviour {
-    onEquip(ship: Ship) { }
-    onUnequip(ship: Ship) { }
-    onTurnStart(ship: Ship) { }
-    onTurnEnd(ship: Ship) { }
-}
-
-export class StructuralItem extends ItemBehaviour {
-    private statsToAdd = new FlatStats();
-    constructor(data: {statsToAdd: FlatStatsData}) {
-        super();
-        this.statsToAdd.add(data.statsToAdd);
-    }
-    onEquip(ship: Ship): void {
-        super.onEquip(ship);
-        ship.itemStats.add(this.statsToAdd);
-    }
-
-    onUnequip(ship: Ship): void {
-        super.onUnequip(ship);
-        ship.itemStats.remove(this.statsToAdd);
-    }
-}
-
-export class CardProvider extends Item {
-    private playedCards = new Array<Card>();
-    private provideCards = new Array<CardTemplate>();
-    constructor(data: {provideCards: CardTemplate[]}) {
-        super();
-        this.provideCards = data.provideCards;
-    }
-    
-    onUnequip(ship: Ship): void {
-        super.onUnequip(ship);
-        for (const card of this.playedCards) {
-            ship.removeCard(card);
+        for (const behaviour of this.behaviours) {
+            behaviour.onTurnEnd(ship);
         }
     }
 }
 
-const ItemBehaviourLookup: Record<ItemBehaviourKind, new (data: any) => ItemBehaviour> = {
-    [ItemBehaviourKind.structuralItem]: StructuralItem,
-    [ItemBehaviourKind.cardProvier]: CardProvider
+abstract class ItemBehaviour {
+    game: Game;
+    item: Item;
+    constructor(game: Game, item: Item) {
+        this.game = game;
+        this.item = item;
+    }
+    onMissionStart(ship: Ship) {}
+    onTurnStart(ship: Ship) {}
+    onTurnEnd(ship: Ship) {}
 }
+
+export class StructuralItemBehaviour extends ItemBehaviour {
+    private statsToAdd = new FlatStats();
+    constructor(game: Game, item: Item, data: { statsToAdd: FlatStatsData }) {
+        super(game, item);
+        this.statsToAdd.add(data.statsToAdd);
+    }
+    onMissionStart(ship: Ship): void {
+        ship.itemStats.add(this.statsToAdd);
+    }
+
+    onUnequip(ship: Ship): void {
+        ship.itemStats.remove(this.statsToAdd);
+    }
+}
+
+export class CardProviderBehaviour extends ItemBehaviour {
+    private playedCards = new Set<number>();
+    private provideCards = new Array<CardTemplate>();
+    constructor(game: Game, item: Item, data: { provideCards: Array<string> }) {
+        super(game, item);
+        for (const card of data.provideCards) {
+            let cardTemplate: CardTemplate;
+            cardTemplate = this.game.cardTemplates.get(card);
+            this.provideCards.push(cardTemplate);
+        }
+    }
+
+    cardPlayed(id: number): void {
+        this.playedCards.delete(id);
+    }
+
+    onMissionStart(ship: Ship): void {
+        console.log(ship.name + " equipped " + this.item.name);
+        for (const cardTemplate of this.provideCards) {
+            const card = this.game.cardFromTemplate(cardTemplate, this)
+            ship.graveyard.push(card);
+        }
+    }
+
+    onUnequip(ship: Ship): void {
+        for (const card of this.playedCards) {
+            ship.removeCardId(card);
+        }
+    }
+}
+
+const ItemBehaviourLookup: Record<ItemBehaviourKind, new (game: Game, item: Item, data: any) => ItemBehaviour> = {
+    [ItemBehaviourKind.structuralItem]: StructuralItemBehaviour,
+    [ItemBehaviourKind.consumableProvider]: CardProviderBehaviour,
+};

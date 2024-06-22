@@ -675,5 +675,101 @@
                 "required": false
             }
         ]
+    },
+    {
+        "name": "game",
+        "description": "game",
+        "options": [
+            {
+                "type": 1,
+                "name": "cards",
+                "description": "See your cards"
+            },
+            {
+                "type": 1,
+                "name": "tick",
+                "description": "[CHEAT] tick"
+            },
+            {
+                "type": 1,
+                "name": "show-landmarks",
+                "description": "show landmarks"
+            },
+            {
+                "type": 1,
+                "name": "join-mission",
+                "description": "sign up for the next mission"
+            },
+            {
+                "type": 1,
+                "name": "leave-mission",
+                "description": "quit the upcoming mission"
+            },
+            {
+                "type": 1,
+                "name": "create-ship",
+                "description": "Creates a ship for you",
+                "options": [
+                    {
+                        "type": 3,
+                        "name": "ship-name",
+                        "description": "The name of the ship",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "type": 1,
+                "name": "get-item",
+                "description": "[CHEAT] Get an item",
+                "options": [
+                    {
+                        "type": 3,
+                        "name": "item-id",
+                        "description": "The name of the item",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "type": 1,
+                "name": "buy-item",
+                "description": "purchase an item from the store",
+                "options": [
+                    {
+                        "type": 4,
+                        "name": "trade-id",
+                        "description": "The ID of the trade",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "type": 1,
+                "name": "target-landmark",
+                "description": "target a landmark",
+                "options": [
+                    {
+                        "type": 4,
+                        "name": "landmark-id",
+                        "description": "The ID of the landmark",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "type": 1,
+                "name": "play-card",
+                "description": "Play a card",
+                "options": [
+                    {
+                        "type": 4,
+                        "name": "card-id",
+                        "description": "The ID of the card",
+                        "required": true
+                    }
+                ]
+            }
+        ]
     }
 ]
