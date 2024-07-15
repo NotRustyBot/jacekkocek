@@ -683,8 +683,31 @@
             {
                 "type": 1,
                 "name": "cards",
-                "description": "See your cards"
+                "description": "Show cards that you have in your hand, discard pile or draw pile",
+                "options": [
+                    {
+                        "type": 4,
+                        "name": "pile",
+                        "description": "Which pile to show",
+                        "required": true,
+                        "choices": [
+                            {
+                                "name": "Hand",
+                                "value": 0
+                            },
+                            {
+                                "name": "Discard pile",
+                                "value": 1
+                            },
+                            {
+                                "name": "Draw pile",
+                                "value": 2
+                            }
+                        ]
+                    }
+                ]
             },
+          
             {
                 "type": 1,
                 "name": "tick",
@@ -728,6 +751,23 @@
                         "name": "item-id",
                         "description": "The name of the item",
                         "required": true
+                    }
+                ]
+            },
+            {
+                "type": 1,
+                "name": "status",
+                "description": "Shows mission-important info about your ship"
+            },
+            {
+                "type": 1,
+                "name": "ship-info",
+                "description": "Show ship info, optionally for another user",
+                "options": [
+                    {
+                        "type": 6,
+                        "name": "user",
+                        "description": "The owner of the ship to display info for"
                     }
                 ]
             },

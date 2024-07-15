@@ -26,22 +26,32 @@ export class FlatStats {
     }
 
     remove(other: FlatStatsData) {
-        this.agility = Math.max(this.agility - (other.agility ?? 0), 0);
-        this.sensors = Math.max(this.sensors - (other.sensors ?? 0), 0);
-        this.crew = Math.max(this.crew - (other.crew ?? 0), 0);
+        this.agility -= other.agility ?? 0;
+        this.sensors -= other.sensors ?? 0;
+        this.crew -= other.crew ?? 0;
     }
 
     toString() {
+        return FlatStats.toString(this);
+    }
+
+    static toString(stats: FlatStatsData) {
         const parts = [];
-        if (this.agility) parts.push(`agility: ${this.agility}`);
-        if (this.sensors) parts.push(`sensors: ${this.sensors}`);
-        if (this.crew) parts.push(`crew: ${this.crew}`);
+        if (stats.agility) parts.push(`agility: ${stats.agility}`);
+        if (stats.sensors) parts.push(`sensors: ${stats.sensors}`);
+        if (stats.crew) parts.push(`crew: ${stats.crew}`);
         return parts.join(", ");
     }
 }
 
-export class Ship {
+export type ShipPreferences = {
+    cardDescriptionsInStatus: boolean;
+};
 
+export class Ship {
+    preferences: ShipPreferences = {
+        cardDescriptionsInStatus: true,
+    };
     target: Landmark;
     playCard(cardId: number) {
         const card = this.hand[cardId];
@@ -107,8 +117,8 @@ export class Ship {
     }
 
     turnStart() {
-        console.log("start turn" ,this.hand);
-        
+        console.log("start turn", this.hand);
+
         for (const [id, item] of this.items) {
             console.log("Starting item " + item.name);
             item.onTurnStart(this);
@@ -192,7 +202,6 @@ export class Ship {
         console.log("Added card " + card.name);
 
         this.hand.push(card);
-        
     }
 
     removeCard(card: Card) {
@@ -206,12 +215,11 @@ export class Ship {
 
     removeCardId(cardId: number) {
         const cardHandIndex = this.hand.findIndex((c) => c.id == cardId);
-        if (cardHandIndex == -1)  return;
+        if (cardHandIndex == -1) return;
         console.log(this.hand.map((c) => c.name));
         console.log("Removed card " + cardHandIndex);
         this.hand.splice(cardHandIndex, 1);
         console.log(this.hand.map((c) => c.name));
-        
     }
 
     addItem(item: Item) {
@@ -264,5 +272,17 @@ export class Ship {
         } else {
             return "Item not found";
         }
+    }
+
+    addResource(resource: string, amount: number) {
+        this.resources[resource] = (this.resources[resource] ?? 0) + amount;
+    }   
+
+    spendResource(resource: string, amount: number) {
+        if (this.resources[resource] < amount) {
+            return false;
+        }
+        this.resources[resource] = (this.resources[resource] ?? 0) - amount;
+        return true;
     }
 }

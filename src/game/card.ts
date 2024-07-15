@@ -54,10 +54,6 @@ export class Card {
         return this.template.name;
     }
 
-    public get description(): string {
-        return cardTemplateDescribe(this.template);
-    }
-
     canBePlayed(ship: Ship): boolean {
         let allOkay = true;
         let behaviour = this.template.behaviour;
@@ -104,16 +100,9 @@ const cardBehaviourLookup: Record<
     {
         condition?: (ship: Ship, card: Card, data?: any) => boolean;
         effect: (ship: Ship, card: Card, data?: any) => string;
-        description: (data?: any) => CardDescription;
     }
 > = {
     [CardBehaviourKind.spendStats]: {
-        description: (data?: any) => ({
-            kind: CardBehaviourKind.spendStats,
-            details: {
-                stats: data.stats as FlatStatsData,
-            },
-        }),
         condition(ship: Ship, card: Card, data: any) {
             const stats = data.stats as FlatStatsData;
             for (const [key, value] of Object.entries<number>(stats)) {
@@ -134,12 +123,6 @@ const cardBehaviourLookup: Record<
     },
 
     [CardBehaviourKind.gainStats]: {
-        description: (data?: any) => ({
-            kind: CardBehaviourKind.gainStats,
-            details: {
-                stats: data.stats as FlatStatsData,
-            },
-        }),
         effect(ship: Ship, card: Card, data: any) {
             const statsData = data.stats as FlatStatsData;
             const stats = new FlatStats(statsData);
@@ -148,12 +131,6 @@ const cardBehaviourLookup: Record<
         },
     },
     [CardBehaviourKind.awardVictoryPoints]: {
-        description: (data?: any) => ({
-            kind: CardBehaviourKind.awardVictoryPoints,
-            details: {
-                victoryPoints: data.victoryPoints as number,
-            },
-        }),
         effect(ship: Ship, card: Card, data: any) {
             const victoryPoints = data.victoryPoints as number;
             ship.victoryPoints += victoryPoints;
@@ -161,12 +138,6 @@ const cardBehaviourLookup: Record<
         },
     },
     [CardBehaviourKind.interactWithLandmark]: {
-        description: (data?: any) => ({
-            kind: CardBehaviourKind.interactWithLandmark,
-            details: {
-                interactionType: data.interactionType as string,
-            },
-        }),
         condition(ship, card, data) {
             return ship.target instanceof Landmark;
         },
@@ -176,12 +147,6 @@ const cardBehaviourLookup: Record<
         },
     },
     [CardBehaviourKind.interactWithRandomLandmark]: {
-        description: (data?: any) => ({
-            kind: CardBehaviourKind.interactWithRandomLandmark,
-            details: {
-                interactionType: data.interactionType as string,
-            },
-        }),
         effect(ship: Ship, card: Card, data: any) {
             const values = [...ship.game.landmarks.values()];
             let valid = values.filter((v) => data.visible == undefined || v.visible == data.visible);
@@ -195,9 +160,6 @@ const cardBehaviourLookup: Record<
         },
     },
     [CardBehaviourKind.drawCard]: {
-        description: (data?: any) => ({
-            kind: CardBehaviourKind.drawCard,
-        }),
         effect(ship: Ship, card: Card, data: any) {
             const quantity = data.quantity as number;
             ship.drawCards(quantity);
@@ -205,20 +167,8 @@ const cardBehaviourLookup: Record<
         },
     },
     [CardBehaviourKind.nothing]: {
-        description: (data?: any) => `Do nothing`,
         effect(ship: Ship, card: Card, data: any) {
             return "Nothing happens";
         },
     },
 };
-
-export function cardTemplateDescribe(template: CardTemplate) {
-    let behaviour = template.behaviour;
-    let result = new Array<string>();
-    while (behaviour) {
-        const describe = cardBehaviourLookup[behaviour.kind].description;
-        result.push(describe(behaviour.data));
-        behaviour = behaviour.followUp;
-    }
-    return result.join("\n") + (template.description ?? "");
-}

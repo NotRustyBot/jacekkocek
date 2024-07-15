@@ -1,4 +1,4 @@
-import { CardTemplate, cardTemplateDescribe } from "./card";
+import { CardTemplate } from "./card";
 import { Game } from "./game";
 import { FlatStats, FlatStatsData, Ship } from "./ship";
 import { pickRandom } from "./utils";
@@ -377,7 +377,7 @@ const landmarkInteractionBehaviourLookup: { [K in LandmarkInteractionBehaviourTy
         },
         description: (landmark: Landmark<{ cardIds: Array<number> }>, data) => {
             const template = landmark.game.cardTemplates.get(data.card);
-            return `Receive card \`${template.name}\`:\n${cardTemplateDescribe(template)}.\n`;
+            return `Receive card \`${template.name}\``;
         },
     },
     [LandmarkInteractionBehaviourType.dealDamage]: {

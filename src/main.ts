@@ -735,6 +735,13 @@ client.on("interactionCreate", async (interaction) => {
                         break;
                     }
 
+                    case "ship-info": {
+                        const user = interaction.options.getUser("user")?.id ?? interaction.user.id;
+                        const result = discordInterface.shipInfo(interaction.user.id, user);
+                        interaction.reply(result);
+                        break;
+                    }
+
                     case "play-card": {
                         const id = interaction.options.getInteger("card-id");
                         const result = discordInterface.playCard(interaction.user.id, id);
@@ -750,8 +757,15 @@ client.on("interactionCreate", async (interaction) => {
                     }
 
                     case "cards": {
-                        const result = discordInterface.showCards(interaction.user.id);
-                        interaction.reply({ content: result });
+                        const option = interaction.options.getInteger("pile");
+                        const result = discordInterface.showCards(interaction.user.id, option);
+                        interaction.reply(result);
+                        break;
+                    }
+
+                    case "status": {
+                        const result = discordInterface.status(interaction.user.id);
+                        interaction.reply(result);
                         break;
                     }
 

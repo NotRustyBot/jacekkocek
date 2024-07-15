@@ -4,10 +4,19 @@ import { Game } from "./game";
 import { Item } from "./item";
 import { Ship } from "./ship";
 import { scenario } from "./scenario";
+import { DiscordRenderer } from "./renderers/discordRenderer";
+import { title } from "process";
+
+export enum CardPile  {
+    hand = 0,
+    discard = 1,
+    draw = 2,
+}
 
 export class DiscordGameInterface {
     game: Game;
     userShips: Map<string, Ship>;
+    renderer = new DiscordRenderer();
     constructor(channel: TextChannel) {
         this.game = new Game((s) => {
             console.log("say: " + s);
@@ -46,6 +55,12 @@ export class DiscordGameInterface {
         return this.game.acceptTrade(ship, tradeId);
     }
 
+    shipInfo(user: string, about: string) {
+        const ship = this.userShips.get(about);
+        if (!ship) return "Ship not found";
+        return this.renderer.shipOverview(ship, user != about);
+    }
+
     targetLandmark(user: string, landmarkId: number) {
         const ship = this.userShips.get(user);
         if (ship) {
@@ -60,13 +75,33 @@ export class DiscordGameInterface {
         this.game.tick();
     }
 
-    showCards(user: string) {
+    
+    showCards(user: string, pile: CardPile) {
         const ship = this.userShips.get(user);
         if (ship) {
-            const cards = [...ship.hand].map((card, id) => id + ": **" + card.name + "**\n" + card.description + "\n");
-            return ship.name +"\nstats:\n"+ ship.totalStats().toString()+ "\ncards: " + "\n" + cards.join("\n");
+            switch (pile) {
+                case CardPile.hand:
+                    return this.renderer.showHand(ship);
+                case CardPile.discard:
+                    return this.renderer.showDiscard(ship);
+                case CardPile.draw:
+                    return this.renderer.showDraw(ship);
+                default:
+                    break;
+            }
+            return this.renderer.showHand(ship);
         } else {
-            return "Ship not found";
+            throw new Error("Ship not found");
+        }
+    }
+
+    
+    status(user: string) {
+        const ship = this.userShips.get(user);
+        if (ship) {
+            return this.renderer.myStatus(ship);
+        } else {
+            throw new Error("Ship not found");
         }
     }
 
