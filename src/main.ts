@@ -775,7 +775,6 @@ client.on("interactionCreate", async (interaction) => {
                         break;
                     }
 
-
                     case "join-mission": {
                         const result = discordInterface.joinMission(interaction.user.id);
                         interaction.reply({ content: result });
@@ -794,11 +793,46 @@ client.on("interactionCreate", async (interaction) => {
                         break;
                     }
 
+                    case "show-offers": {
+                        const result = discordInterface.showOffers(interaction.user.id);
+                        interaction.reply(result);
+                        break;
+                    }
+
+                    case "accept-offer": {
+                        const id = interaction.options.getInteger("offer-id");
+                        const result = discordInterface.acceptOffer(interaction.user.id, id);
+                        interaction.reply(result);
+                        break;
+                    }
+
                     case "target-landmark": {
                         const id = interaction.options.getInteger("landmark-id");
                         const result = discordInterface.targetLandmark(interaction.user.id, id);
                         interaction.reply({ content: result });
                         break;
+                    }
+                    default: {
+                        const subcommandGroup = interaction.options.getSubcommandGroup(false);
+                        const subcommand = interaction.options.getSubcommand(false);
+                        switch (subcommandGroup) {
+                            case "stowage":
+                                switch (subcommand) {
+                                    case "stow": {
+                                        const stowId = interaction.options.getInteger("id");
+                                        const result = discordInterface.stowageAction(interaction.user.id, stowId, true);
+                                        interaction.reply(result);
+                                        break;
+                                    }
+                                    case "unstow": {
+                                        const unstowId = interaction.options.getInteger("id");
+                                        const result = discordInterface.stowageAction(interaction.user.id, unstowId, false);
+                                        interaction.reply(result);
+                                        break;
+                                    }
+                                }
+                                break;
+                        }
                     }
                 }
                 break;

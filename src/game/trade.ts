@@ -1,11 +1,11 @@
 import { ItemTemplate } from "./item";
+import { StateCheck } from "./sidequest";
 
 export type TradeTemplate = {
     name: string;
     price: Record<string, number>;
     item: ItemTemplate | string;
-    gameRequirements?: Record<string, number>;
-    shipRequirements?: Record<string, number>;
+    requirements?: Array<StateCheck>;
 };
 
 export class TradeOfferHandler {

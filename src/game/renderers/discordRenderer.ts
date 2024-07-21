@@ -1,6 +1,9 @@
-import { APIEmbed, InteractionReplyOptions} from "discord.js";
+import { APIEmbed, InteractionReplyOptions, MessagePayload } from "discord.js";
 import { Card, CardBehaviourKind } from "../card";
 import { FlatStats, Ship } from "../ship";
+import { StateCheckType } from "../sidequest";
+import { variableRangeString } from "../utils";
+import { PartnerActionType } from "../partner";
 
 //function that mixes arrays and returns a copy
 export function shuffle<T>(array: Array<T>): Array<T> {
@@ -15,6 +18,52 @@ export function shuffle<T>(array: Array<T>): Array<T> {
 }
 
 export class DiscordRenderer {
+    showOffers(ship: Ship) {
+        if (ship.offers.size === 0) return { embeds: [{ title: "No offers" }] };
+        const embeds: APIEmbed[] = [];
+        for (const [id, offer] of ship.offers) {
+            let requirements = new Array<string>();
+            for (const requirement of offer.data.requirements) {
+                switch (requirement.type) {
+                    case StateCheckType.Ship:
+                    case StateCheckType.Partner:
+                    case StateCheckType.Game:
+                        if (requirement.type === StateCheckType.Ship) requirements.push("**Your ship**");
+                        if (requirement.type === StateCheckType.Partner) requirements.push("**" + offer.partner + "**");
+                        if (requirement.type === StateCheckType.Game) requirements.push("**The World**");
+
+                        for (const range of requirement.range) {
+                            requirements.push("- " + variableRangeString(range));
+                        }
+                        break;
+
+                    case StateCheckType.Loyalty:
+                        requirements.push("**Loyalty**");
+                        if (requirement.min != undefined) requirements.push("- At least " + requirement.min + " loyalty");
+                        if (requirement.max != undefined) requirements.push("- At most " + requirement.max + " loyalty");
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+
+            let offerPoints = new Array<string>();
+            for (const action of offer.data.actions) {
+                switch (action.type) {
+                    case PartnerActionType.Sidequest:
+                        offerPoints.push("** Quest:" + action.sidequest + "**");
+                        offerPoints.push(ship.game.sidequestTemplates.get(action.sidequest).description);
+                        break;
+                }
+            }
+
+            const desc = `## Requirements\n${requirements.join("\n")}\n\n## Actions\n${offerPoints.join("\n")}`;
+            embeds.push({ title: "`" + id + "` Offer from " + offer.partner, description: desc, fields: [] });
+        }
+        return { embeds: embeds, body: "You have " + ship.offers.size + " offers" };
+    }
+
     showDraw(ship: Ship) {
         const embed: APIEmbed = {
             title: "Draw Pile",
@@ -150,6 +199,16 @@ export class DiscordRenderer {
     }
 
     shipOverview(ship: Ship, limited = false): InteractionReplyOptions {
+        const items = new Array<string>();
+        for (const [id, item] of ship.items) {
+            items.push(`\`${id}\` **${item.name}**: ${item.description}\n- ${item.getItemFunctionalityDescription().join("\n- ")}`);
+        }
+
+        const stowedItems = new Array<string>();
+        for (const [id, item] of ship.stowage) {
+            stowedItems.push(`\`${id}\` **${item.name}**: ${item.description}\n- ${item.getItemFunctionalityDescription().join("\n- ")}`);
+        }
+
         return {
             embeds: [
                 {
@@ -157,9 +216,16 @@ export class DiscordRenderer {
                     fields: [
                         {
                             name: "Resources",
-                            value: Object.entries(ship.resources).map(([k, v]) => `${k}:${v}`).join(", "),
-                            inline: true,
-                        }
+                            value: ship.resources.toString(),
+                        },
+                        {
+                            name: "Items",
+                            value: items.join("\n"),
+                        },
+                        {
+                            name: "Stowed Items",
+                            value: stowedItems.join("\n"),
+                        },
                     ],
                 },
             ],
@@ -194,5 +260,8 @@ const cardDesctiptionLookup: Record<
     },
     [CardBehaviourKind.nothing]: {
         description: (card: Card, data: any) => `does nothing`,
+    },
+    [CardBehaviourKind.interactWithQuestLandmark]: {
+        description: (card: Card, data: any) => `${data.interactionType} quest landmark`,
     },
 };

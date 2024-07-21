@@ -1,6 +1,7 @@
 import { CardDescription } from "./actionResults";
 import { Landmark } from "./landmark";
 import { FlatStatsData, FlatStats, Ship } from "./ship";
+import { Sidequest } from "./sidequest";
 import { pickRandom } from "./utils";
 
 type CardBehaviour = {
@@ -32,6 +33,7 @@ export enum CardBehaviourKind {
     gainStats = "gainStats",
     awardVictoryPoints = "awardVictoryPoints",
     interactWithLandmark = "interactWithLandmark",
+    interactWithQuestLandmark = "interactWithQuestLandmark",
     interactWithRandomLandmark = "interactWithRandomLandmark",
     drawCard = "drawCard",
     nothing = "nothing",
@@ -129,6 +131,19 @@ const cardBehaviourLookup: Record<
             ship.turnStats.add(stats);
             return "gained " + stats.toString();
         },
+    },
+    [CardBehaviourKind.interactWithQuestLandmark] : {
+        effect(ship: Ship, card: Card, data: any) {
+            const quest = card.provider as Sidequest;
+            const landmark = quest.landmarks.get(data.nametag);
+            console.log("nametag: " + data.nametag);
+            
+            if (landmark) {
+                return landmark.landmarkInteraction(data.interactionType, ship);
+            } else {
+                return "landmark not found";
+            }
+        }  
     },
     [CardBehaviourKind.awardVictoryPoints]: {
         effect(ship: Ship, card: Card, data: any) {

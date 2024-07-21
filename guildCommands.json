@@ -707,7 +707,39 @@
                     }
                 ]
             },
-          
+            {
+                "type": 2,
+                "name": "stowage",
+                "description": "Stowage related commands",
+                "options": [
+                    {
+                        "type": 1,
+                        "name": "stow",
+                        "description": "Stow an item",
+                        "options": [
+                            {
+                                "type": 4,
+                                "name": "id",
+                                "description": "The ID of the item to stow",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "type": 1,
+                        "name": "unstow",
+                        "description": "Unstow an item",
+                        "options": [
+                            {
+                                "type": 4,
+                                "name": "id",
+                                "description": "The ID of the item to unstow",
+                                "required": true
+                            }
+                        ]
+                    }
+                ]
+            },
             {
                 "type": 1,
                 "name": "tick",
@@ -717,6 +749,24 @@
                 "type": 1,
                 "name": "show-landmarks",
                 "description": "show landmarks"
+            },
+            {
+                "type": 1,
+                "name": "show-offers",
+                "description": "show offers"
+            },
+            {
+                "type": 1,
+                "name": "accept-offer",
+                "description": "Accept an offer",
+                "options": [
+                    {
+                        "type": 4,
+                        "name": "offer-id",
+                        "description": "The ID of the offer",
+                        "required": true
+                    }
+                ]
             },
             {
                 "type": 1,

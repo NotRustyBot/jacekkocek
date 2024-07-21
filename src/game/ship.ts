@@ -1,8 +1,11 @@
-import { Card, CardProvider, CardTemplate, Discardability } from "./card";
+import { Card, Discardability } from "./card";
 import { Game } from "./game";
 import { HandStats } from "./handStatus";
 import { Item } from "./item";
 import { Landmark } from "./landmark";
+import { Partner, PartnerOfferData } from "./partner";
+import { Resources } from "./resources";
+import { Variables } from "./variables";
 
 export type FlatStatsData = {
     agility?: number;
@@ -23,6 +26,14 @@ export class FlatStats {
         this.agility = this.agility + (other.agility ?? 0);
         this.sensors = this.sensors + (other.sensors ?? 0);
         this.crew = this.crew + (other.crew ?? 0);
+    }
+
+    set(other: FlatStatsData) {
+        //set stats if defined, if not, keep current value
+        this.agility = other.agility ?? this.agility;
+        this.sensors = other.sensors ?? this.sensors;
+        this.crew = other.crew ?? this.crew;
+
     }
 
     remove(other: FlatStatsData) {
@@ -53,13 +64,47 @@ export class Ship {
         cardDescriptionsInStatus: true,
     };
     target: Landmark;
+    variables = Variables.fromRecord({});
+    loyalty = new Map<Partner, number>();
+    offers = new Map<number, PartnerOfferData>();
+    offerIndex = 0;
+
     playCard(cardId: number) {
         const card = this.hand[cardId];
-        if (card.canBePlayed(this)) {
-            return this.name + " plays: " + card.name + "\n" + card.play(this);
+        if (card && card.canBePlayed(this)) {
+            const result = card.play(this);
+            this.game.checkSidequests();
+            return this.name + " plays: " + card.name + "\n" + result;
         } else {
             return "Can't do that";
         }
+    }
+
+    addOffer(offer: PartnerOfferData) {
+        this.offers.set(this.offerIndex++, offer);
+    }
+
+    acceptOffer(id: number) {
+        const offer = this.offers.get(id);
+        if (offer) {
+            const partner = this.game.partners.get(offer.partner);
+            const canAccept = this.game.stateRequirementsMet(offer.data.requirements, { ship: this, partner: partner });
+            if (canAccept) {
+                partner.actions(offer.data.actions, this);
+                this.offers.delete(id);
+                return "Offer accepted";
+            }
+            return "Can't accept offer";
+        }
+        return "Can't find offer";
+    }
+
+    alterLoyalty(partner: Partner, amount: number) {
+        this.loyalty.set(partner, (this.loyalty.get(partner) ?? 0) + amount);
+    }
+
+    getTotalLoyalty(partner: Partner) {
+        return this.loyalty.get(partner) ?? 0;
     }
 
     dealDamage(damage: number) {
@@ -168,8 +213,8 @@ export class Ship {
     deck = new Array<Card>();
     graveyard = new Array<Card>();
     items = new Map<number, Item>();
-    storage = new Map<number, Item>();
-    resources: Record<string, number> = {};
+    stowage = new Map<number, Item>();
+    resources = new Resources();
     name: string;
     victoryPoints = 0;
     hp = 10;
@@ -241,7 +286,7 @@ export class Ship {
     }
 
     addItemToStowage(item: Item) {
-        this.storage.set(item.id, item);
+        this.stowage.set(item.id, item);
     }
 
     equipStowedItem(itemId: number) {
@@ -249,10 +294,10 @@ export class Ship {
             return "Ship is on a mission. You can't stow items while on a mission.";
         }
 
-        const item = this.storage.get(itemId);
+        const item = this.stowage.get(itemId);
         if (item) {
             this.addItem(item);
-            this.storage.delete(itemId);
+            this.stowage.delete(itemId);
             return item.name + " equipped";
         } else {
             return "Item not found";
@@ -266,7 +311,7 @@ export class Ship {
 
         if (this.items.has(itemId)) {
             const item = this.items.get(itemId)!;
-            this.storage.set(itemId, item);
+            this.stowage.set(itemId, item);
             this.removeItem(item);
             return item.name;
         } else {
@@ -276,7 +321,7 @@ export class Ship {
 
     addResource(resource: string, amount: number) {
         this.resources[resource] = (this.resources[resource] ?? 0) + amount;
-    }   
+    }
 
     spendResource(resource: string, amount: number) {
         if (this.resources[resource] < amount) {

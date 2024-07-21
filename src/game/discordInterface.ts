@@ -5,9 +5,8 @@ import { Item } from "./item";
 import { Ship } from "./ship";
 import { scenario } from "./scenario";
 import { DiscordRenderer } from "./renderers/discordRenderer";
-import { title } from "process";
 
-export enum CardPile  {
+export enum CardPile {
     hand = 0,
     discard = 1,
     draw = 2,
@@ -75,7 +74,6 @@ export class DiscordGameInterface {
         this.game.tick();
     }
 
-    
     showCards(user: string, pile: CardPile) {
         const ship = this.userShips.get(user);
         if (ship) {
@@ -95,7 +93,6 @@ export class DiscordGameInterface {
         }
     }
 
-    
     status(user: string) {
         const ship = this.userShips.get(user);
         if (ship) {
@@ -119,6 +116,40 @@ export class DiscordGameInterface {
             return ship.playCard(cardId);
         } else {
             return "Ship not found";
+        }
+    }
+
+    acceptOffer(user: string, offer: number) {
+        const ship = this.userShips.get(user);
+        if (ship) {
+            return ship.acceptOffer(offer);
+        } else {
+            return "Ship not found";
+        }
+    }
+
+    showOffers(user: string) {
+        const ship = this.userShips.get(user);
+        if (ship) {
+            return this.renderer.showOffers(ship);
+        } else {
+            throw new Error("Ship not found");
+        }
+    }
+
+    stowageAction(id: string, stowId: number, toStowage: boolean) {
+        const ship = this.userShips.get(id);
+        if (ship) {
+            if (toStowage) {
+                ship.stowItem(stowId);
+                return "successfully stowed " + ship.stowage.get(stowId).name;
+            } else {
+                ship.equipStowedItem(stowId);
+                return "successfully equipped stowed " + ship.items.get(stowId).name;
+            }
+
+        } else {
+            throw new Error("Ship not found");
         }
     }
 }

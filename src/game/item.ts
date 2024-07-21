@@ -38,7 +38,11 @@ export class Item {
     }
 
     public get description(): string {
-        return this.description;
+        return this.template.description;
+    }
+
+    getItemFunctionalityDescription(){
+        return this.behaviours.map(behaviour => behaviour.describe());
     }
 
     onMissionStart(ship: Ship) {
@@ -70,6 +74,8 @@ abstract class ItemBehaviour {
     onMissionStart(ship: Ship) {}
     onTurnStart(ship: Ship) {}
     onTurnEnd(ship: Ship) {}
+
+    abstract describe();
 }
 
 export class StructuralItemBehaviour extends ItemBehaviour {
@@ -84,6 +90,10 @@ export class StructuralItemBehaviour extends ItemBehaviour {
 
     onUnequip(ship: Ship): void {
         ship.itemStats.remove(this.statsToAdd);
+    }
+
+    describe() {
+        return "Adds stats: " + this.statsToAdd.toString();
     }
 }
 
@@ -115,6 +125,16 @@ export class CardProviderBehaviour extends ItemBehaviour {
         for (const card of this.playedCards) {
             ship.removeCardId(card);
         }
+    }
+
+    describe() {
+        const cards = this.provideCards.reduce((acc, val) => {
+            const count = acc.get(val.name) || 0;
+            acc.set(val.name, count + 1);
+            return acc;
+        }, new Map<string, number>());
+        const strings = Array.from(cards.entries()).map(([name, count]) => count > 1 ? `${count}x ${name}` : name);
+        return "Provides cards: " + strings.join(", ");
     }
 }
 

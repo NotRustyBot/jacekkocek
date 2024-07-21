@@ -1,7 +1,9 @@
 import { CardTemplate } from "./card";
 import { Game } from "./game";
 import { FlatStats, FlatStatsData, Ship } from "./ship";
+import { Sidequest } from "./sidequest";
 import { pickRandom } from "./utils";
+import { Variables } from "./variables";
 
 type LandmarkAugmentedPassiveBehaviour =
     | {
@@ -19,7 +21,7 @@ type LandmarkAugmentedPassiveBehaviour =
           data: FollowUp;
       }
     | {
-          type: LandmarkPassiveBehaviourType.spendStat;
+          type: LandmarkPassiveBehaviourType.alterLandmarkVariable;
           data: { stat: string; whenAvailable: FollowUp; whenNotAvailable?: FollowUp };
       }
     | {
@@ -31,7 +33,14 @@ export enum LandmarkInteractionType {
     discover = "discover",
     attack = "attack",
     capture = "capture",
+    hack = "hack",
 }
+
+export type VariableAlteration = {
+    variable: string;
+    value: number;
+    force?: boolean;
+};
 
 export enum LandmarkPassiveEventType {
     turnStart = "turnStart",
@@ -56,14 +65,15 @@ export type LandmarkTemplate = {
     visible?: true;
 };
 
-export class Landmark<T = any> {
+export class Landmark {
     game: Game;
     id: number;
     template: LandmarkTemplate;
     visible = false;
-    stats: T;
+    stats: Variables;
     cardIds = new Map<number, LandmarkAugmentedInteractionBehaviour>();
-    redirect = new Map<string, Array<Landmark<any>>>();
+    sidequest: Sidequest;
+    redirect = new Map<string, Array<Landmark>>();
     public get name(): string {
         return this.template.name;
     }
@@ -72,11 +82,11 @@ export class Landmark<T = any> {
         this.id = id;
         this.game = game;
         this.template = template;
-        this.stats = template.stats as T;
+        this.stats = Variables.fromRecord(template.stats);
         this.visible = !!template.visible;
     }
 
-    addRedirect(actions: string | Array<string>, landmark: Landmark<any>) {
+    addRedirect(actions: string | Array<string>, landmark: Landmark) {
         if (!Array.isArray(actions)) actions = [actions];
         for (const action of actions) {
             if (this.redirect.has(action)) {
@@ -102,7 +112,7 @@ export class Landmark<T = any> {
         }
     }
 
-    triggerIntecept(landmark: Landmark<any>, ship: Ship, interruptTripped: [boolean]) {
+    triggerIntecept(landmark: Landmark, ship: Ship, interruptTripped: [boolean]) {
         if (this.template.intercepts == null) return;
         for (const intercept of this.template.intercepts) {
             if (intercept.tags.every((t) => landmark.template.tags?.includes(t))) {
@@ -236,7 +246,8 @@ export class Landmark<T = any> {
 
 export enum LandmarkInteractionBehaviourType {
     awardVictoryPoints = "awardVictoryPoints",
-    consumeStats = "consumeStats",
+    alterShipStats = "alterShipStats",
+    alterShipVariable = "alterShipVariable",
     triggerPassiveBehaviour = "triggerPassiveBehaviour",
     checkVisibility = "checkVisibility",
     defaultDiscover = "defaultDiscover",
@@ -260,7 +271,7 @@ export type LandmarkAugmentedInteractionBehaviour =
           };
       }
     | {
-          type: LandmarkInteractionBehaviourType.consumeStats;
+          type: LandmarkInteractionBehaviourType.alterShipStats;
           data: {
               stats: FlatStatsData;
           };
@@ -296,6 +307,10 @@ export type LandmarkAugmentedInteractionBehaviour =
           data: {
               followUp?: FollowUp;
           };
+      }
+    | {
+          type: LandmarkInteractionBehaviourType.alterShipVariable;
+          data: VariableAlteration;
       };
 
 type LandmarkInteractionBehaviour<T> = {
@@ -313,15 +328,30 @@ const landmarkInteractionBehaviourLookup: { [K in LandmarkInteractionBehaviourTy
             return `Gain ${data.victoryPoints} victory points.`;
         },
     },
-    [LandmarkInteractionBehaviourType.consumeStats]: {
+    [LandmarkInteractionBehaviourType.alterShipStats]: {
         action: (landmark: Landmark, ship: Ship, data) => {
             const fs = new FlatStats(data.stats);
-            ship.turnStats.remove(fs);
-            return ship.name + " lost " + fs.toString() + " to " + landmark.name;
+            ship.turnStats.add(fs);
+            return landmark.name + " changes " + ship.name + " stats: " + fs.toString();
         },
         description: (landmark: Landmark, data) => {
-            return `Spend ${new FlatStats(data.stats).toString()} to ${landmark.name}.`;
+            return `${landmark.name} changes ship stats: ${new FlatStats(data.stats).toString()}`;
         },
+    },
+    [LandmarkInteractionBehaviourType.alterShipVariable]: {
+        action: (landmark: Landmark, ship: Ship, data) => {
+            ship.variables.alterValue(data.variable, data.value, data.force);
+            if(data.force){
+                return landmark.name + " changes " + ship.name + " variable " + data.variable + " to " + data.value;
+            }
+            return landmark.name + " changes " + ship.name + " variable " + data.variable + " by " + data.value;
+        },
+        description: (landmark: Landmark, data) => {
+            if (data.force) {
+                return `${landmark.name} changes ship variable ${data.variable} to ${data.value}`;
+            }
+            return `${landmark.name} changes ship variable ${data.variable} by ${data.value}`;
+        }
     },
     [LandmarkInteractionBehaviourType.triggerPassiveBehaviour]: {
         action: (landmark: Landmark, ship: Ship, data) => {
@@ -368,14 +398,14 @@ const landmarkInteractionBehaviourLookup: { [K in LandmarkInteractionBehaviourTy
         },
     },
     [LandmarkInteractionBehaviourType.provideCard]: {
-        action: (landmark: Landmark<{ cardIds: Array<number> }>, ship: Ship, data) => {
+        action: (landmark: Landmark, ship: Ship, data) => {
             const template = ship.game.cardTemplates.get(data.card);
             const cardInstance = ship.game.cardFromTemplate(template, landmark);
             ship.addCard(cardInstance);
             landmark.cardIds.set(cardInstance.id, data.info);
             return ship.name + " received " + template.name;
         },
-        description: (landmark: Landmark<{ cardIds: Array<number> }>, data) => {
+        description: (landmark: Landmark, data) => {
             const template = landmark.game.cardTemplates.get(data.card);
             return `Receive card \`${template.name}\``;
         },
@@ -410,10 +440,12 @@ const landmarkInteractionBehaviourLookup: { [K in LandmarkInteractionBehaviourTy
 
 export enum LandmarkPassiveBehaviourType {
     changeVisibility = "changeVisibility",
-    spendStat = "spendStat",
+    alterLandmarkVariable = "alterLandmarkVariable",
+    alterGameVariable = "alterGameVariable",
     interactWithEveryone = "interactWithEveryone",
     pickRandomShip = "pickRandomShip",
     checkStat = "checkStat",
+    alterQuestVariable = "alterQuestVariable",
 }
 
 type LandmarkPasssiveBehaviour = {
@@ -431,7 +463,15 @@ const landmarkPassiveBehaviourLookup: Record<LandmarkPassiveBehaviourType, Landm
             return `${landmark.name} becomes ${data.visible ? "visible" : "hidden"}.`;
         },
     },
-    [LandmarkPassiveBehaviourType.spendStat]: {
+    [LandmarkPassiveBehaviourType.alterGameVariable]: {
+        action: (landmark: Landmark, data: VariableAlteration) => {
+            landmark.game.variables.alterValue(data.variable, data.value, data.force);
+        },
+        description: (landmark: Landmark, data: VariableAlteration) => {
+            return `${landmark.name} changes game variable ${data.variable} to ${data.value}.`;
+        }
+    },
+    [LandmarkPassiveBehaviourType.alterLandmarkVariable]: {
         action: (landmark: Landmark, data: { stat: string; whenAvailable: FollowUp; whenNotAvailable?: FollowUp }) => {
             if (landmark.stats[data.stat] > 0) {
                 landmark.stats[data.stat]--;
@@ -464,6 +504,14 @@ const landmarkPassiveBehaviourLookup: Record<LandmarkPassiveBehaviourType, Landm
             const whenAvailable = followUpDescription(landmark, data.whenAvailable);
             const whenNotAvailable = data.whenNotAvailable ? followUpDescription(landmark, data.whenNotAvailable) : undefined;
             return `${landmark.name} checks ${data.stat}, ${whenAvailable} ${whenNotAvailable ? "or " + whenNotAvailable : ""}.`;
+        },
+    },
+    [LandmarkPassiveBehaviourType.alterQuestVariable]: {
+        action: (landmark: Landmark, data: { variable: string; value: number }) => {
+            landmark.sidequest.variables.alterValue(data.variable, data.value);
+        },
+        description: (landmark: Landmark, data: { variable: string; value: number }) => {
+            return `${landmark.name} changes ${data.variable} to ${data.value}.`;
         },
     },
     [LandmarkPassiveBehaviourType.interactWithEveryone]: {
