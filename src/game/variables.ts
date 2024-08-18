@@ -7,7 +7,7 @@ export class Variables {
         }
         return vars;
     }
-    
+
     alterValues(alterations: Variables | Record<string, number>, force: boolean = false) {
         alterations = alterations instanceof Variables ? alterations.values : alterations;
         for (const key in alterations) {
@@ -23,26 +23,50 @@ export class Variables {
         }
     }
 
-    meetsRequirements(requirements: Record<string, number>) {
+    meetsRequirements(requirements: Record<string, number>, invert: boolean = false) {
         for (const key in requirements) {
-            if (this[key] < requirements[key]) {
-                return false;
+            if (invert) {
+                if (this[key] < -requirements[key]) {
+                    return false;
+                }
+            } else {
+                if (this[key] < requirements[key]) {
+                    return false;
+                }
             }
         }
         return true;
     }
 
-
     withinRange(range: VariableRange) {
-        const {min, max} = range;
+        const { min, max } = range;
         for (const key in this.values) {
-            // min or max may not have the given key, only fail if there is key but value is out of range
-            if (key in min && this.values[key] < min[key]) return false;
-            if (key in max && this.values[key] > max[key]) return false;
+            if (min && key in min && this.values[key] < min[key]) return false;
+            if (max && key in max && this.values[key] > max[key]) return false;
         }
         return true;
     }
+
+    static toString(values: Record<string, number>) {
+        let str = [];
+        for (const key in values) {
+            str.push(`${key}: ${values[key]}`);
+        }
+
+        return str.join(", ");
+    }
+
+    static invert(values: Record<string, number>) {
+        const result: Record<string, number> = {};
+        for (const key in values) {
+            result[key] = -values[key];
+        }
+        return result;
+    }
+
+    toString() {
+        return Variables.toString(this.values);
+    }
 }
 
-
-export type VariableRange = {min?: Record<string, number>, max?: Record<string, number>};
+export type VariableRange = { min?: Record<string, number>; max?: Record<string, number> };

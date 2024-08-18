@@ -1,59 +1,13 @@
+import { deserealizeParameters, executeAbsoluteActions, OfferData } from "./absoluteAction";
 import { Card, Discardability } from "./card";
 import { Game } from "./game";
 import { HandStats } from "./handStatus";
 import { Item } from "./item";
 import { Landmark } from "./landmark";
-import { Partner, PartnerOfferData } from "./partner";
+import { Partner } from "./partner";
 import { Resources } from "./resources";
 import { Variables } from "./variables";
 
-export type FlatStatsData = {
-    agility?: number;
-    sensors?: number;
-    crew?: number;
-};
-
-export class FlatStats {
-    agility = 0;
-    sensors = 0;
-    crew = 0;
-
-    constructor(stats?: FlatStatsData) {
-        Object.assign(this, stats);
-    }
-
-    add(other: FlatStatsData) {
-        this.agility = this.agility + (other.agility ?? 0);
-        this.sensors = this.sensors + (other.sensors ?? 0);
-        this.crew = this.crew + (other.crew ?? 0);
-    }
-
-    set(other: FlatStatsData) {
-        //set stats if defined, if not, keep current value
-        this.agility = other.agility ?? this.agility;
-        this.sensors = other.sensors ?? this.sensors;
-        this.crew = other.crew ?? this.crew;
-
-    }
-
-    remove(other: FlatStatsData) {
-        this.agility -= other.agility ?? 0;
-        this.sensors -= other.sensors ?? 0;
-        this.crew -= other.crew ?? 0;
-    }
-
-    toString() {
-        return FlatStats.toString(this);
-    }
-
-    static toString(stats: FlatStatsData) {
-        const parts = [];
-        if (stats.agility) parts.push(`agility: ${stats.agility}`);
-        if (stats.sensors) parts.push(`sensors: ${stats.sensors}`);
-        if (stats.crew) parts.push(`crew: ${stats.crew}`);
-        return parts.join(", ");
-    }
-}
 
 export type ShipPreferences = {
     cardDescriptionsInStatus: boolean;
@@ -66,7 +20,7 @@ export class Ship {
     target: Landmark;
     variables = Variables.fromRecord({});
     loyalty = new Map<Partner, number>();
-    offers = new Map<number, PartnerOfferData>();
+    offers = new Map<number, OfferData>();
     offerIndex = 0;
 
     playCard(cardId: number) {
@@ -74,23 +28,23 @@ export class Ship {
         if (card && card.canBePlayed(this)) {
             const result = card.play(this);
             this.game.checkSidequests();
-            return this.name + " plays: " + card.name + "\n" + result;
+            return this.name + " plays: " + card.name + "\n" + result.join("\n");
         } else {
             return "Can't do that";
         }
     }
 
-    addOffer(offer: PartnerOfferData) {
+    addOffer(offer: OfferData) {
         this.offers.set(this.offerIndex++, offer);
     }
 
     acceptOffer(id: number) {
         const offer = this.offers.get(id);
+        const params = deserealizeParameters(this.game, offer.parameters ?? {});
         if (offer) {
-            const partner = this.game.partners.get(offer.partner);
-            const canAccept = this.game.stateRequirementsMet(offer.data.requirements, { ship: this, partner: partner });
+            const canAccept = this.game.stateRequirementsMet(offer.requirements, { ship: this, ...params});
             if (canAccept) {
-                partner.actions(offer.data.actions, this);
+                executeAbsoluteActions(offer.actions, { game: this.game, ship: this, ...params});
                 this.offers.delete(id);
                 return "Offer accepted";
             }
@@ -115,17 +69,15 @@ export class Ship {
         }
     }
 
-    calculateVictoryPoints(statsThatCount: FlatStatsData) {
-        statsThatCount.agility = statsThatCount.agility ?? 0;
-        statsThatCount.crew = statsThatCount.crew ?? 0;
-        statsThatCount.sensors = statsThatCount.sensors ?? 0;
-
+    calculateVictoryPoints(statsThatCount: Variables) {
         let totalStast = this.totalStats();
 
         let vp = 0;
-        vp += statsThatCount.agility * totalStast.agility;
-        vp += statsThatCount.crew * totalStast.crew;
-        vp += statsThatCount.sensors * totalStast.sensors;
+
+        for (const key in statsThatCount.values) {
+            vp += statsThatCount.values[key] * (totalStast[key] ?? 0);
+        }
+
         this.victoryPoints += vp;
         return vp;
     }
@@ -143,7 +95,7 @@ export class Ship {
     }
 
     turnEnd() {
-        this.turnStats = new FlatStats();
+        this.turnStats = new Variables();
         for (const [id, item] of this.items) {
             item.onTurnEnd(this);
         }
@@ -157,7 +109,6 @@ export class Ship {
 
     currentHandStats() {
         const stats = { ...this.baseHandStats };
-
         return stats;
     }
 
@@ -200,10 +151,10 @@ export class Ship {
     }
 
     totalStats() {
-        const total = new FlatStats();
-        total.add(this.baseStats);
-        total.add(this.itemStats);
-        total.add(this.turnStats);
+        const total = new Variables();
+        total.alterValues(this.baseStats);
+        total.alterValues(this.itemStats);
+        total.alterValues(this.turnStats);
         return total;
     }
 
@@ -225,14 +176,14 @@ export class Ship {
         draw: 2,
     };
 
-    baseStats = new FlatStats({
+    baseStats = Variables.fromRecord({
         agility: 3,
         sensors: 3,
         crew: 3,
     });
 
-    itemStats = new FlatStats();
-    turnStats = new FlatStats();
+    itemStats = new Variables();
+    turnStats = new Variables();
 
     constructor(game: Game, name: string) {
         this.name = name;

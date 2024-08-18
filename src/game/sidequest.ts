@@ -1,13 +1,14 @@
 import deepmerge from "deepmerge";
-import { CardProvider, CardTemplate } from "./card";
+import { CardTemplate } from "./card";
 import { Game } from "./game";
 import { Landmark } from "./landmark";
 import { Ship } from "./ship";
 import { DeepPartial } from "./utils";
 import { VariableRange, Variables } from "./variables";
-import { Partner, PartnerActionData, PartnerActionType } from "./partner";
+import { Partner } from "./partner";
+import {  AbsoluteActions, executeAbsoluteActions } from "./absoluteAction";
 
-export class Sidequest implements CardProvider {
+export class Sidequest {
     game: Game;
     public id: number;
     template: SidequestTemplate;
@@ -24,8 +25,6 @@ export class Sidequest implements CardProvider {
         this.partner = partner;
         this.variables = Variables.fromRecord(template?.variables);
     }
-
-    cardPlayed(id: number): void {}
 
     setupActions() {
         for (const action of this.template.setupActions) {
@@ -63,7 +62,7 @@ export class Sidequest implements CardProvider {
         if (isCompleted) {
             this.game.say(`Sidequest ${this.template.name} completed!`);
             this.game.sidequests.delete(this.id);
-            this.partner.actions(this.template.reward, this.ship);
+            executeAbsoluteActions(this.template.reward, { game: this.game, sidequest: this, ship: this.ship });
         }
     }
 }
@@ -75,12 +74,11 @@ export enum SidequestActionKind {
 
 export type SidequestTemplate = {
     name: string;
-    description: string;
     variables?: Record<string, number>;
     completionRequirements: Array<StateCheck>;
     setupActions: Array<SidequestAction>;
-    reward: Array<PartnerActionData>;
-};
+    reward: AbsoluteActions
+}
 
 type SidequestLandmarkData = {
     nametag: string;
@@ -88,66 +86,96 @@ type SidequestLandmarkData = {
 };
 
 export enum StateCheckType {
-    Game,
-    Partner,
-    Ship,
-    AnyShip,
-    OtherShip,
-    Landmark,
-    LandmarkDestroyed,
-    Sidequest,
-    Loyalty,
+    Game = "Game",
+    Partner = "Partner",
+    Ship = "Ship",
+    AnyShip = "AnyShip",
+    OtherShip = "OtherShip",
+    Landmark = "Landmark",
+    TaggedLandmark = "TaggedLandmark",
+    LandmarkDestroyed = "LandmarkDestroyed",
+    Sidequest = "Sidequest",
+    Loyalty = "Loyalty",
+    Stats = "Stats",
+    LandmarkVisible = "LandmarkVisible",
 }
 
-type StateCheckGame = {
+export type StateCheckGame = {
     type: StateCheckType.Game;
     range: Array<VariableRange>;
 };
 
-type StateCheckPartner = {
+export type StateCheckPartner = {
     type: StateCheckType.Partner;
     range: Array<VariableRange>;
 };
 
-type StateCheckShip = {
+export type StateCheckShip = {
     type: StateCheckType.Ship;
     range: Array<VariableRange>;
 };
 
-type StateCheckAnyShip = {
+export type StateCheckAnyShip = {
     type: StateCheckType.AnyShip;
     range: Array<VariableRange>;
 };
 
-type StateCheckOtherShip = {
+export type StateCheckOtherShip = {
     type: StateCheckType.OtherShip;
     range: Array<VariableRange>;
 };
 
-type StateCheckSidequest = {
+export type StateCheckSidequest = {
     type: StateCheckType.Sidequest;
     range: Array<VariableRange>;
 };
 
-type StateCheckLandmark = {
+export type StateCheckLandmark = {
     type: StateCheckType.Landmark;
-    nametag: string;
     range: Array<VariableRange>;
 };
 
-type StateCheckLandmarkDestroyed = {
+export type StateCheckLandmarkDestroyed = {
     type: StateCheckType.LandmarkDestroyed;
     nametag: string;
 };
 
-type StateCheckLoyalty = {
+export type StateCheckLoyalty = {
     type: StateCheckType.Loyalty;
     min?: number;
     max?: number;
 };
 
-export type StateCheck = StateCheckGame | StateCheckPartner | StateCheckShip | StateCheckAnyShip | StateCheckOtherShip | StateCheckLandmark | StateCheckLandmarkDestroyed | StateCheckSidequest | StateCheckLoyalty;
+export type StateCheckStats = {
+    type: StateCheckType.Stats;
+    range: Array<VariableRange>;
+};
 
+export type StateCheckLandmarkVisible = {
+    type: StateCheckType.LandmarkVisible;
+    nametag?: string;
+    visible?: boolean;
+};
+
+export type StateCheckTaggedLandmark = {
+    type: StateCheckType.TaggedLandmark;
+    nametag: string;
+    range: Array<VariableRange>;
+};
+
+export type StateCheck =
+    | StateCheckGame
+    | StateCheckPartner
+    | StateCheckShip
+    | StateCheckAnyShip
+    | StateCheckOtherShip
+    | StateCheckLandmark
+    | StateCheckLandmarkDestroyed
+    | StateCheckSidequest
+    | StateCheckLoyalty
+    | StateCheckStats
+    | StateCheckLandmarkVisible
+    | StateCheckTaggedLandmark;
 
 type SidequestAction = SidequestActionGiveCards | SidequestActionCreateLandmark;
 

@@ -1,13 +1,13 @@
-import { Card, CardProvider, CardTemplate } from "./card";
+import { Card, CardTemplate } from "./card";
 import { ContentData } from "./content";
 import { Item, ItemTemplate } from "./item";
 import { Landmark, LandmarkPassiveEventType, LandmarkTemplate } from "./landmark";
 import { Partner } from "./partner";
 import { Resources } from "./resources";
-import { FlatStats, FlatStatsData, Ship } from "./ship";
+import { Ship } from "./ship";
 import { Sidequest, SidequestTemplate, StateCheck, StateCheckType } from "./sidequest";
 import { TradeOfferHandler, TradeTemplate } from "./trade";
-import { pickRandom, requirementsMet } from "./utils";
+import { pickRandom } from "./utils";
 import { Variables } from "./variables";
 
 export class Game {
@@ -143,7 +143,7 @@ export class Game {
         }
     }
 
-    cardFromTemplate(template: CardTemplate, provider: CardProvider): Card {
+    cardFromTemplate(template: CardTemplate, provider: Sidequest): Card {
         const card = new Card(this.cardIdProvider(), template, provider);
         card.template = template;
         return card;
@@ -166,7 +166,17 @@ export class Game {
         return this.cardTemplates.get(id);
     }
 
-    stateRequirementsMet(requirements: StateCheck[], { ship, landmarks, partner, sidequest }: { ship?: Ship; landmarks?: Map<string, Landmark>; partner?: Partner; sidequest?: Sidequest }) {
+    stateRequirementsMet(
+        requirements: StateCheck[],
+        {
+            ship,
+            landmarks,
+            partner,
+            sidequest,
+            stats,
+            landmark,
+        }: { ship?: Ship; landmarks?: Map<string, Landmark>; partner?: Partner; sidequest?: Sidequest; stats?: Record<string, number>; landmark?: Landmark},
+    ) {
         for (const requirement of requirements) {
             if (
                 (() => {
@@ -176,9 +186,13 @@ export class Game {
                         if (!ship) return false;
                         variables = ship.variables;
                     } else if (requirement.type === StateCheckType.Landmark) {
-                        const landmark = landmarks?.get(requirement.nametag);
                         if (!landmark) return false;
+                        console.log(landmark);
                         variables = landmark.stats;
+                    } else if (requirement.type === StateCheckType.TaggedLandmark) {
+                        let useLandmark = landmarks?.get(requirement.nametag);
+                        if (!useLandmark) return false;
+                        variables = useLandmark.stats;
                     } else if (requirement.type === StateCheckType.Partner) {
                         if (!partner) return false;
                         variables = partner.variables;
@@ -204,6 +218,13 @@ export class Game {
                         if (requirement.max && loyalty > requirement.max) return false;
                         if (requirement.min && loyalty < requirement.min) return false;
                         return true;
+                    } else if (requirement.type === StateCheckType.Stats) {
+                        variables = Variables.fromRecord(stats);
+                    } else if (requirement.type === StateCheckType.LandmarkVisible) {
+                        let useLandmark = landmarks?.get(requirement.nametag);
+                        if (!useLandmark) useLandmark = landmark;
+                        if (!useLandmark) return false;
+                        return useLandmark.visible == (requirement.visible ?? true);
                     }
 
                     for (const range of requirement.range) {
@@ -264,13 +285,10 @@ export class Game {
 
     rewardPool = {
         resources: new Resources({
-            gold: 0,
-            xp: 0,
-            crew: 0,
         }),
     };
 
-    missionObjective: FlatStatsData = { agility: 1, crew: 1 };
+    missionObjective = Variables.fromRecord({ agility: 1, crew: 1 });
 
     currentTrades = new Map<number, TradeTemplate>();
     setupStore() {
@@ -309,11 +327,11 @@ export class Game {
     acceptTrade(ship: Ship, tradeId: number) {
         const trade = this.currentTrades.get(tradeId);
 
-        if(trade === undefined) {
+        if (trade === undefined) {
             return `no such trade!`;
         }
 
-        if(!ship.resources.hasEnoughResource(trade.price)) {
+        if (!ship.resources.hasEnoughResource(trade.price)) {
             return `${ship.name} does not have enough resources!`;
         }
 
@@ -364,7 +382,7 @@ export class Game {
         }
 
         console.log([...this.landmarks.values()].map((landmark) => landmark.name).join("\n"));
-        let briefing = `Next mission info:\n \`${this.turnsLeft}\` turns. \`${this.landmarks.size}\` landmarks. Points will be awarded for \`${Object.keys(this.missionObjective).join(", ")}\``;
+        let briefing = `Next mission info:\n \`${this.turnsLeft}\` turns. \`${this.landmarks.size}\` landmarks. Points will be awarded for \`${this.missionObjective.toString()}\``;
         this.say(briefing);
     }
 

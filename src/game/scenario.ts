@@ -8,7 +8,7 @@ export function scenario(dif: DiscordGameInterface) {
     dif.createShip("645206726097764364", "Norubo");
     dif.joinMission("645206726097764364");
     dif.getItem("645206726097764364", "SPAM Launcher");
-    dif.getItem("532918953014722560", "Silkers Tactical Team");
+    dif.getItem("645206726097764364", "Silkers Tactical Team");
     dif.getItem("645206726097764364", "Antikythera Computing System");
 
     dif.userShips.get("645206726097764364").preferences.cardDescriptionsInStatus = false;

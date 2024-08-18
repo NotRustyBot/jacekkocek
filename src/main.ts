@@ -789,7 +789,7 @@ client.on("interactionCreate", async (interaction) => {
 
                     case "show-landmarks": {
                         const result = discordInterface.showLandmarks();
-                        interaction.reply({ content: result });
+                        interaction.reply(result);
                         break;
                     }
 

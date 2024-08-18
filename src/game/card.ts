@@ -1,18 +1,8 @@
-import { CardDescription } from "./actionResults";
+import { AbsoluteAction, AbsoluteActions, AbsoluteActionType, executeAbsoluteActions } from "./absoluteAction";
 import { Landmark } from "./landmark";
-import { FlatStatsData, FlatStats, Ship } from "./ship";
-import { Sidequest } from "./sidequest";
-import { pickRandom } from "./utils";
-
-type CardBehaviour = {
-    kind: CardBehaviourKind;
-    followUp?: CardBehaviour;
-    data?: any;
-};
-
-export type CardProvider = {
-    cardPlayed(id: number): void;
-};
+import { Ship } from "./ship";
+import { Sidequest, StateCheck } from "./sidequest";
+import { Variables } from "./variables";
 
 export enum Discardability {
     turn = "turn",
@@ -21,169 +11,78 @@ export enum Discardability {
 }
 
 export type CardTemplate = {
-    behaviour: CardBehaviour;
+    conditions?: Array<StateCheck>;
+    behaviour: AbsoluteActions;
     name: string;
     description?: string;
+
     discardability?: Discardability;
     exhaust?: true;
 };
 
-export enum CardBehaviourKind {
-    spendStats = "spendStats",
-    gainStats = "gainStats",
-    awardVictoryPoints = "awardVictoryPoints",
-    interactWithLandmark = "interactWithLandmark",
-    interactWithQuestLandmark = "interactWithQuestLandmark",
-    interactWithRandomLandmark = "interactWithRandomLandmark",
-    drawCard = "drawCard",
-    nothing = "nothing",
-}
+export type ActionResult = {
+    success: boolean;
+    reason?: string;
+};
 
 export class Card {
     id: number;
     template: CardTemplate;
     discardability: Discardability;
-    provider?: CardProvider;
+    sidequest?: Sidequest;
 
-    constructor(id: number, template: CardTemplate, provider?: CardProvider) {
+    constructor(id: number, template: CardTemplate, sidequest?: Sidequest) {
         this.id = id;
+        this.sidequest = sidequest;
         this.template = template;
         this.discardability = template.discardability ?? Discardability.level;
-        this.provider = provider;
     }
 
     public get name(): string {
         return this.template.name;
     }
 
-    canBePlayed(ship: Ship): boolean {
-        let allOkay = true;
-        let behaviour = this.template.behaviour;
-        while (behaviour) {
-            const condition = cardBehaviourLookup[behaviour.kind].condition;
-            if (condition && !condition(ship, this, behaviour.data)) {
-                allOkay = false;
-                break;
-            }
-            behaviour = behaviour.followUp;
+    canBePlayed(ship: Ship) {
+        if (this.template.conditions != undefined) {
+            return ship.game.stateRequirementsMet(this.template.conditions, { ship: ship }) && this.checkBehaviours(ship).success;
         }
-        return allOkay;
+        return this.checkBehaviours(ship).success;
     }
 
-    play(ship: Ship): string {
-        let behaviour = this.template.behaviour;
-        let result = new Array<string>();
-        while (behaviour) {
-            const effect = cardBehaviourLookup[behaviour.kind].effect;
-            result.push(effect(ship, this, behaviour.data));
-            behaviour = behaviour.followUp;
+    private checkBehaviours(ship: Ship) {
+        let behaviours: Array<AbsoluteAction> = [];
+        if (!(this.template.behaviour instanceof Array)) {
+            behaviours.push(this.template.behaviour);
+        } else {
+            behaviours = this.template.behaviour;
         }
 
+        const results = new Array<ActionResult>();
+        let overallSuccess = true;
+        let failResasons = new Array<string>(); 
+
+        for (const behaviour of behaviours) {
+            switch (behaviour.type) {
+                case AbsoluteActionType.AlterShipStats:
+                    if (!ship.totalStats().meetsRequirements(behaviour.stats)) {
+                        failResasons.push(`You need ${Variables.toString(behaviour.stats)} (You have ${ship.totalStats().toString()})`);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return { success: overallSuccess, results: results };
+    }
+
+    play(ship: Ship) {
+        const result = executeAbsoluteActions(this.template.behaviour, { game: ship.game, ship: ship, landmark: ship.target, sidequest: this.sidequest });
         if (this.template.exhaust) {
-            ship.removeCard(this);
+            ship.removeCardId(this.id);
         } else {
             ship.graveyardCard(this);
         }
-
-        return result.join("\n");
-    }
-
-    static appendbehaviour(cardTemplate: CardTemplate, behaviour: CardBehaviour) {
-        let lastBehaviour = cardTemplate.behaviour;
-        while (lastBehaviour.followUp) {
-            lastBehaviour = lastBehaviour.followUp;
-        }
-        lastBehaviour.followUp = behaviour;
+        return result;
     }
 }
-
-const cardBehaviourLookup: Record<
-    CardBehaviourKind,
-    {
-        condition?: (ship: Ship, card: Card, data?: any) => boolean;
-        effect: (ship: Ship, card: Card, data?: any) => string;
-    }
-> = {
-    [CardBehaviourKind.spendStats]: {
-        condition(ship: Ship, card: Card, data: any) {
-            const stats = data.stats as FlatStatsData;
-            for (const [key, value] of Object.entries<number>(stats)) {
-                if (value > 0) {
-                    if (ship.totalStats()[key] < value) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        },
-        effect(ship: Ship, card: Card, data: any) {
-            const statsData = data.stats as FlatStatsData;
-            const stats = new FlatStats(statsData);
-            ship.turnStats.remove(stats);
-            return "spent " + stats.toString();
-        },
-    },
-
-    [CardBehaviourKind.gainStats]: {
-        effect(ship: Ship, card: Card, data: any) {
-            const statsData = data.stats as FlatStatsData;
-            const stats = new FlatStats(statsData);
-            ship.turnStats.add(stats);
-            return "gained " + stats.toString();
-        },
-    },
-    [CardBehaviourKind.interactWithQuestLandmark] : {
-        effect(ship: Ship, card: Card, data: any) {
-            const quest = card.provider as Sidequest;
-            const landmark = quest.landmarks.get(data.nametag);
-            console.log("nametag: " + data.nametag);
-            
-            if (landmark) {
-                return landmark.landmarkInteraction(data.interactionType, ship);
-            } else {
-                return "landmark not found";
-            }
-        }  
-    },
-    [CardBehaviourKind.awardVictoryPoints]: {
-        effect(ship: Ship, card: Card, data: any) {
-            const victoryPoints = data.victoryPoints as number;
-            ship.victoryPoints += victoryPoints;
-            return "awarded " + victoryPoints + " victory points";
-        },
-    },
-    [CardBehaviourKind.interactWithLandmark]: {
-        condition(ship, card, data) {
-            return ship.target instanceof Landmark;
-        },
-        effect(ship: Ship, card: Card, data: any) {
-            const result = ship.target.landmarkInteraction(data.interactionType, ship);
-            return result;
-        },
-    },
-    [CardBehaviourKind.interactWithRandomLandmark]: {
-        effect(ship: Ship, card: Card, data: any) {
-            const values = [...ship.game.landmarks.values()];
-            let valid = values.filter((v) => data.visible == undefined || v.visible == data.visible);
-            const pick = pickRandom(valid);
-
-            if (pick) {
-                return pick.landmarkInteraction(data.interactionType, ship);
-            } else {
-                return "no landmarks found";
-            }
-        },
-    },
-    [CardBehaviourKind.drawCard]: {
-        effect(ship: Ship, card: Card, data: any) {
-            const quantity = data.quantity as number;
-            ship.drawCards(quantity);
-            return "Drawn " + quantity + " card" + (quantity == 1 ? "" : "s");
-        },
-    },
-    [CardBehaviourKind.nothing]: {
-        effect(ship: Ship, card: Card, data: any) {
-            return "Nothing happens";
-        },
-    },
-};

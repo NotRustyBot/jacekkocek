@@ -1,11 +1,13 @@
 import { Card, CardTemplate } from "./card";
 import { Game } from "./game";
-import { FlatStatsData, FlatStats, Ship } from "./ship";
+import { Ship } from "./ship";
+import { Variables } from "./variables";
 
 export enum ItemBehaviourKind {
     structuralItem,
     consumableProvider,
 }
+
 type ItemBehaviourDefinition = {
     kind: ItemBehaviourKind;
     followUp?: ItemBehaviourDefinition;
@@ -79,17 +81,17 @@ abstract class ItemBehaviour {
 }
 
 export class StructuralItemBehaviour extends ItemBehaviour {
-    private statsToAdd = new FlatStats();
-    constructor(game: Game, item: Item, data: { statsToAdd: FlatStatsData }) {
+    private statsToAdd = new Variables();
+    constructor(game: Game, item: Item, data: { statsToAdd: Record<string, number> }) {
         super(game, item);
-        this.statsToAdd.add(data.statsToAdd);
+        this.statsToAdd.alterValues(data.statsToAdd);
     }
     onMissionStart(ship: Ship): void {
-        ship.itemStats.add(this.statsToAdd);
+        ship.itemStats.alterValues(this.statsToAdd);
     }
 
     onUnequip(ship: Ship): void {
-        ship.itemStats.remove(this.statsToAdd);
+        ship.itemStats.alterValues(Variables.invert(this.statsToAdd.values));
     }
 
     describe() {

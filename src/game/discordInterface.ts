@@ -1,4 +1,4 @@
-import { TextChannel } from "discord.js";
+import { BaseMessageOptions, TextChannel } from "discord.js";
 import { content } from "./content";
 import { Game } from "./game";
 import { Item } from "./item";
@@ -43,9 +43,10 @@ export class DiscordGameInterface {
         return this.game.leaveMission(this.userShips.get(user));
     }
 
-    showLandmarks() {
-        const landmarks = [...this.game.landmarks.entries()].filter(([id, landmark]) => landmark.visible).map(([id, landmark]) => id + ": **" + landmark.name + "**\n" + landmark.description());
-        return "landmarks: " + landmarks.join("\n");
+    showLandmarks(): BaseMessageOptions {
+        const landmarkList = this.renderer.landmarks([...this.game.landmarks.values()].filter((landmark) => landmark.visible));
+        if (landmarkList.embeds.length > 0) return landmarkList;
+        return { embeds: [{ title: "No landmarks found" }] };
     }
 
     buyItem(user: string, tradeId: number) {
@@ -63,8 +64,12 @@ export class DiscordGameInterface {
     targetLandmark(user: string, landmarkId: number) {
         const ship = this.userShips.get(user);
         if (ship) {
-            ship.target = this.game.landmarks.get(landmarkId);
-            return "successfully targeted landmark " + ship.target.name + " for " + ship.name;
+            ship.target = [...this.game.landmarks.values()].filter((landmark) => landmark.visible)[landmarkId];
+            if (ship.target) {
+                return "successfully targeted landmark " + ship.target.name + " for " + ship.name;
+            }
+
+            return "Landmark not found";
         } else {
             return "Ship not found";
         }
@@ -147,7 +152,6 @@ export class DiscordGameInterface {
                 ship.equipStowedItem(stowId);
                 return "successfully equipped stowed " + ship.items.get(stowId).name;
             }
-
         } else {
             throw new Error("Ship not found");
         }

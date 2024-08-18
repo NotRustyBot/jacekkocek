@@ -1,8 +1,10 @@
-import { CardBehaviourKind, CardTemplate } from "./card";
+import { AbsoluteActionType } from "./absoluteAction";
+import { CardTemplate } from "./card";
 import { ItemBehaviourKind, ItemTemplate } from "./item";
-import { LandmarkInteractionBehaviourType, LandmarkInteractionType, LandmarkPassiveBehaviourType, LandmarkPassiveEventType, LandmarkTemplate } from "./landmark";
-import { PartnerActionType, PartnerTemplate } from "./partner";
+import { LandmarkInteractionType, LandmarkPassiveEventType, LandmarkTemplate } from "./landmark";
+import { PartnerTemplate } from "./partner";
 import { SidequestActionKind, SidequestTemplate, StateCheckType } from "./sidequest";
+import { StatusEffectTemplate } from "./statusEffect";
 import { TradeTemplate } from "./trade";
 
 export type ContentData = {
@@ -12,6 +14,7 @@ export type ContentData = {
     trades: Array<TradeTemplate>;
     partners: Array<PartnerTemplate>;
     sidequests: Array<SidequestTemplate>;
+    effects: Array<StatusEffectTemplate>;
 };
 
 export const content: ContentData = {
@@ -34,134 +37,147 @@ export const content: ContentData = {
     cards: [
         {
             name: "Ping",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterStats,
                     stats: {
-                        sensors: 4,
+                        ["sensors"]: -3,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.interactWithRandomLandmark,
-                    data: {
-                        interactionType: "discover",
-                        visible: false,
-                    },
+                {
+                    type: AbsoluteActionType.InteractWithRandomLandmark,
+                    conditions: [
+                        {
+                            type: StateCheckType.LandmarkVisible,
+                            visible: false,
+                        },
+                    ],
+                    actions: [
+                        {
+                            type: AbsoluteActionType.InteractWithLandmark,
+                            interaction: "discover",
+                        },
+                    ],
                 },
-            },
+            ],
         },
 
         {
             name: "SPAM Shot",
             behaviour: {
-                kind: CardBehaviourKind.interactWithLandmark,
-                data: {
-                    interactionType: "attack",
-                },
+                type: AbsoluteActionType.InteractWithLandmark,
+                interaction: "attack",
             },
             exhaust: true,
         },
         {
             name: "Tactical Takeover",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterShipStats,
                     stats: {
-                        crew: 5,
+                        ["crew"]: -5,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.interactWithLandmark,
-                    data: {
-                        interactionType: "capture",
-                    },
+                {
+                    type: AbsoluteActionType.InteractWithLandmark,
+                    interaction: "capture",
                 },
-            },
+            ],
         },
         {
             name: "Demolition Squad",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterShipStats,
                     stats: {
-                        crew: 3,
+                        ["crew"]: -3,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.interactWithLandmark,
-                    data: {
-                        interactionType: "attack",
-                    },
+                {
+                    type: AbsoluteActionType.InteractWithLandmark,
+                    interaction: "attack",
                 },
-            },
+            ],
         },
         {
             name: "Exploration Gear",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterShipStats,
                     stats: {
-                        crew: 5,
+                        ["crew"]: -3,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.interactWithRandomLandmark,
-                    data: {
-                        interactionType: "discover",
-                        visible: false,
-                    },
+                {
+                    type: AbsoluteActionType.InteractWithRandomLandmark,
+                    conditions: [
+                        {
+                            type: StateCheckType.LandmarkVisible,
+                            visible: false,
+                        },
+                    ],
+                    actions: [
+                        {
+                            type: AbsoluteActionType.InteractWithLandmark,
+                            interaction: "discover",
+                        },
+                    ],
                 },
-            },
+            ],
         },
         {
             name: "All hands on deck!",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterShipStats,
                     stats: {
-                        crew: 3,
+                        ["crew"]: -3,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.drawCard,
-                    data: {
-                        quantity: 2,
-                    },
+                {
+                    type: AbsoluteActionType.DrawCard,
+                    count: 2,
                 },
-            },
+            ],
         },
         {
             name: "Scout Ahead",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterShipStats,
                     stats: {
-                        agility: 2,
+                        ["agility"]: -3,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.interactWithRandomLandmark,
-                    data: {
-                        interactionType: "discover",
-                        visible: false,
-                    },
+                {
+                    type: AbsoluteActionType.InteractWithRandomLandmark,
+                    conditions: [
+                        {
+                            type: StateCheckType.LandmarkVisible,
+                            visible: false,
+                        },
+                    ],
+                    actions: [
+                        {
+                            type: AbsoluteActionType.InteractWithLandmark,
+                            interaction: "discover",
+                        },
+                    ],
                 },
-            },
+            ],
         },
         {
             name: "Heat",
-            behaviour: {
-                kind: CardBehaviourKind.nothing,
-                data: {},
-            },
+            behaviour: [],
         },
         {
             name: "Objective Coordinates",
             behaviour: {
-                kind: CardBehaviourKind.interactWithQuestLandmark,
-                data: {
-                    interactionType: "discover",
-                    visible: false,
+                type: AbsoluteActionType.InteractWithQuestLandmark,
+                actions: {
+                    type: AbsoluteActionType.InteractWithLandmark,
+                    interaction: "discover",
                 },
             },
             exhaust: true,
@@ -169,48 +185,40 @@ export const content: ContentData = {
         {
             name: "Full Thrust",
             behaviour: {
-                kind: CardBehaviourKind.gainStats,
-                data: {
-                    stats: {
-                        agility: 4,
-                    },
+                type: AbsoluteActionType.AlterShipStats,
+                stats: {
+                    ["agility"]: -4,
                 },
             },
         },
         {
             name: "Copycat Exploit",
             behaviour: {
-                kind: CardBehaviourKind.interactWithLandmark,
-                data: {
-                    interactionType: "hack",
-                },
+                type: AbsoluteActionType.InteractWithLandmark,
+                interaction: "hack",
             },
         },
         {
             name: "Assisted Planning",
-            behaviour: {
-                kind: CardBehaviourKind.spendStats,
-                data: {
+            behaviour: [
+                {
+                    type: AbsoluteActionType.AlterShipStats,
                     stats: {
-                        sensors: 5,
+                        sensors: -5,
                     },
                 },
-                followUp: {
-                    kind: CardBehaviourKind.drawCard,
-                    data: {
-                        quantity: 2,
-                    },
+                {
+                    type: AbsoluteActionType.DrawCard,
+                    count: 2,
                 },
-            },
+            ],
         },
         {
             name: "Missile",
             description: "Missile",
             behaviour: {
-                kind: CardBehaviourKind.interactWithLandmark,
-                data: {
-                    interactionType: "attack",
-                },
+                type: AbsoluteActionType.InteractWithLandmark,
+                interaction: "attack",
             },
         },
     ],
@@ -299,33 +307,25 @@ export const content: ContentData = {
             interactions: {
                 attack: [
                     {
-                        type: LandmarkInteractionBehaviourType.destroyLandmark,
-                        data: {
-                            followUp: {
-                                type: LandmarkInteractionBehaviourType.awardVictoryPoints,
-                                data: {
-                                    victoryPoints: 1,
-                                },
-                            },
-                        },
+                        type: AbsoluteActionType.DestroyLandmark,
+                    },
+                    {
+                        type: AbsoluteActionType.AwardVictoryPoints,
+                        victoryPoints: 1,
                     },
                 ],
                 hack: [
                     {
-                        type: LandmarkInteractionBehaviourType.triggerPassiveBehaviour,
-                        data: {
-                            type: LandmarkPassiveBehaviourType.alterQuestVariable,
-                            data: {
-                                variable: "rescued",
-                                value: 1,
-                            },
+                        type: AbsoluteActionType.AlterQuestVariable,
+                        variables: {
+                            rescued: 1,
                         },
                     },
                 ],
                 discover: [
                     {
-                        type: LandmarkInteractionBehaviourType.defaultDiscover,
-                        data: {},
+                        type: AbsoluteActionType.SetLandmarkVisibility,
+                        visible: true,
                     },
                 ],
             },
@@ -336,34 +336,26 @@ export const content: ContentData = {
             interactions: {
                 attack: [
                     {
-                        type: LandmarkInteractionBehaviourType.destroyLandmark,
-                        data: {
-                            followUp: {
-                                type: LandmarkInteractionBehaviourType.awardVictoryPoints,
-                                data: {
-                                    victoryPoints: 1,
-                                },
-                            },
-                        },
+                        type: AbsoluteActionType.DestroyLandmark,
+                    },
+                    {
+                        type: AbsoluteActionType.AwardVictoryPoints,
+                        victoryPoints: 1,
                     },
                 ],
                 capture: [
                     {
-                        type: LandmarkInteractionBehaviourType.destroyLandmark,
-                        data: {
-                            followUp: {
-                                type: LandmarkInteractionBehaviourType.awardVictoryPoints,
-                                data: {
-                                    victoryPoints: 5,
-                                },
-                            },
-                        },
+                        type: AbsoluteActionType.DestroyLandmark,
+                    },
+                    {
+                        type: AbsoluteActionType.AwardVictoryPoints,
+                        victoryPoints: 5,
                     },
                 ],
                 discover: [
                     {
-                        type: LandmarkInteractionBehaviourType.defaultDiscover,
-                        data: {},
+                        type: AbsoluteActionType.SetLandmarkVisibility,
+                        visible: true,
                     },
                 ],
             },
@@ -378,19 +370,12 @@ export const content: ContentData = {
                     interrupt: true,
                     action: [
                         {
-                            type: LandmarkInteractionBehaviourType.triggerPassiveBehaviour,
-                            data: {
-                                type: LandmarkPassiveBehaviourType.changeVisibility,
-                                data: {
-                                    visible: true,
-                                },
-                            },
+                            type: AbsoluteActionType.SetLandmarkVisibility,
+                            visible: true,
                         },
                         {
-                            type: LandmarkInteractionBehaviourType.dealDamage,
-                            data: {
-                                damage: 1,
-                            },
+                            type: AbsoluteActionType.DamageShip,
+                            damage: 1,
                         },
                     ],
                 },
@@ -398,21 +383,17 @@ export const content: ContentData = {
             interactions: {
                 discover: [
                     {
-                        type: LandmarkInteractionBehaviourType.defaultDiscover,
-                        data: {},
+                        type: AbsoluteActionType.SetLandmarkVisibility,
+                        visible: true,
                     },
                 ],
                 attack: [
                     {
-                        type: LandmarkInteractionBehaviourType.destroyLandmark,
-                        data: {
-                            followUp: {
-                                type: LandmarkInteractionBehaviourType.awardVictoryPoints,
-                                data: {
-                                    victoryPoints: 5,
-                                },
-                            },
-                        },
+                        type: AbsoluteActionType.DestroyLandmark,
+                    },
+                    {
+                        type: AbsoluteActionType.AwardVictoryPoints,
+                        victoryPoints: 1,
                     },
                 ],
             },
@@ -427,64 +408,50 @@ export const content: ContentData = {
             visible: true,
             passiveActions: {
                 [LandmarkPassiveEventType.turnEnd]: {
-                    type: LandmarkPassiveBehaviourType.checkStat,
-                    data: {
-                        stat: "free",
-                        whenAvailable: {
-                            type: LandmarkInteractionBehaviourType.triggerPassiveBehaviour,
-                            data: {
-                                type: LandmarkPassiveBehaviourType.alterLandmarkVariable,
-                                data: {
-                                    stat: "missile",
-                                    whenAvailable: {
-                                        type: LandmarkInteractionBehaviourType.triggerPassiveBehaviour,
-                                        data: {
-                                            type: LandmarkPassiveBehaviourType.pickRandomShip,
-                                            data: {
-                                                type: LandmarkInteractionBehaviourType.dealDamage,
-                                                data: {
-                                                    damage: 5,
-                                                },
-                                            },
-                                        },
+                    type: AbsoluteActionType.Condition,
+                    requirements: [
+                        {
+                            type: StateCheckType.Landmark,
+                            range: [
+                                {
+                                    min: {
+                                        missile: 1,
+                                        free: 1,
                                     },
                                 },
+                            ],
+                        },
+                    ],
+                    successActions: [
+                        {
+                            type: AbsoluteActionType.AlterLandmarkVariable,
+                            variables: {
+                                missile: -1,
                             },
                         },
-                    },
+                        {
+                            type: AbsoluteActionType.DamageShip,
+                            damage: 5,
+                        },
+                    ],
                 },
             },
             interactions: {
                 discover: [
                     {
-                        type: LandmarkInteractionBehaviourType.defaultDiscover,
-                        data: {},
+                        type: AbsoluteActionType.SetLandmarkVisibility,
+                        visible: true,
                     },
                 ],
                 capture: [
                     {
-                        type: LandmarkInteractionBehaviourType.provideCard,
-                        data: {
-                            card: "Missile",
-                            info: {
-                                type: LandmarkInteractionBehaviourType.triggerPassiveBehaviour,
-                                data: {
-                                    type: LandmarkPassiveBehaviourType.alterLandmarkVariable,
-                                    data: {
-                                        stat: "missile",
-                                    },
-                                },
-                            },
-                        },
+                        type: AbsoluteActionType.ProvideCard,
+                        card: "Missile",
                     },
                     {
-                        type: LandmarkInteractionBehaviourType.triggerPassiveBehaviour,
-                        data: {
-                            type: LandmarkPassiveBehaviourType.alterLandmarkVariable,
-                            data: {
-                                stat: "free",
-                                whenAvailable: null,
-                            },
+                        type: AbsoluteActionType.SetLandmarkVariable,
+                        variables: {
+                            free: 0,
                         },
                     },
                 ],
@@ -502,109 +469,66 @@ export const content: ContentData = {
                         {
                             type: StateCheckType.Loyalty,
                             min: 0,
+                            max: 0,
                         },
                     ],
                     actions: [
                         {
-                            type: PartnerActionType.Offer,
-                            requirements: [
-                                {
-                                    type: StateCheckType.Loyalty,
-                                    min: 0,
+                            type: AbsoluteActionType.Offer,
+                            offerData: {
+                                parameters: {
+
                                 },
-                            ],
-                            actions: [
-                                {
-                                    type: PartnerActionType.Sidequest,
-                                    sidequest: "Human Resources",
-                                },
-                            ],
+                                description: "One of our potential talents is waiting for evacuation. We're sure they'll happily work for us after this.",
+                                actions: [
+                                    {
+                                        type: AbsoluteActionType.GiveQuest,
+                                        name: "Human Resources",
+                                    },
+                                ],
+                                requirements: [
+                                    {
+                                        type: StateCheckType.Loyalty,
+                                        min: 0,
+                                        max: 0,
+                                    },
+                                ],
+                            },
                         },
                     ],
                 },
             ],
-            allies: [],
-            hostiles: [],
         },
         {
             name: "AIM",
             description: "Alliance for Interstellar Matters. Used to be an influential entity in shaping the course of galactic diplomacy.",
             actions: [],
-            allies: ["Columbic Systems", "Warbird"],
-            hostiles: ["Second Caliber", "Rule Zero"],
         },
         {
             name: "Second Caliber",
             description: "Weapon research, used to be part of AIM. Under investigation after it was suspected that the research was sold to others.",
             actions: [],
-            allies: [],
-            hostiles: ["Warbird"],
         },
         {
             name: "Columbic Systems",
             description: "Manufacturer of ship systems, mainly propulsion and navigation. Developed most of the tech used by AIM.",
             actions: [],
-            allies: ["AIM"],
-            hostiles: ["Rule Zero"],
         },
         {
             name: "Rule Zero",
             description: "Infamous hacker group. Claims to target authoritarians.",
             actions: [],
-            allies: [],
-            hostiles: ["AIM", "Columbic Systems"],
         },
         {
             name: "Warbird",
             description: "New weapons and systems developer for AIM.",
             actions: [],
-            allies: ["AIM"],
-            hostiles: ["Second Caliber"],
         },
     ],
 
     sidequests: [
         {
-            name: "Employee Benefits",
-            description: "We need you to rescue our employee. Open contract.",
-            variables: {
-                rescued: 0,
-            },
-            completionRequirements: [
-                {
-                    type: StateCheckType.Ship,
-                    range: [
-                        {
-                            min: {
-                                rescued: 1,
-                            },
-                            max: {},
-                        },
-                    ],
-                },
-            ],
-            reward: [
-                {
-                    type: PartnerActionType.AlterLoyalty,
-                    amount: 5,
-                },
-                {
-                    type: PartnerActionType.AlterResource,
-                    amount: 5,
-                    resource: "cash",
-                },
-            ],
-            setupActions: [
-                {
-                    kind: SidequestActionKind.createLandmark,
-                    nametag: "office",
-                    template: "Office",
-                },
-            ],
-        },
-        {
             name: "Human Resources",
-            description: "One of our potential talents is waiting for evacuation. We're sure they'll happily work for us after this.",
             variables: {
                 rescued: 0,
             },
@@ -623,8 +547,8 @@ export const content: ContentData = {
             ],
             reward: [
                 {
-                    type: PartnerActionType.AlterLoyalty,
-                    amount: 5,
+                    type: AbsoluteActionType.AlterShipsPartnerLoyalty,
+                    loyalty: 5,
                 },
             ],
             setupActions: [
@@ -640,15 +564,43 @@ export const content: ContentData = {
                             template: "Objective Coordinates",
                             modification: {
                                 behaviour: {
-                                    data: {
-                                        nametag: "lab",
-                                    },
+                                    nametag: "lab",
                                 },
                             },
                         },
                     ],
                 },
             ],
+        },
+    ],
+    effects: [
+        {
+            name: "Inspiration",
+            actions: {
+                Cost: {
+                    type: AbsoluteActionType.Condition,
+                    requirements: [
+                        {
+                            type: StateCheckType.Stats,
+                            range: [
+                                {
+                                    min: {
+                                        crew: 1,
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                    successActions: [
+                        {
+                            type: AbsoluteActionType.AlterStats,
+                            stats: {
+                                crew: 1,
+                            },
+                        },
+                    ],
+                },
+            },
         },
     ],
 };
